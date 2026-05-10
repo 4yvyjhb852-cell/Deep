@@ -615,11 +615,11 @@ class FreudianDynamics:
         )
 
         # Le Moi s'affaiblit avec la fatigue et le stress
-        self.ego_strength = max(0.1, min(1.0,
-            self.ego_strength * 0.98
-            + (nt.serotonin - 0.5) * 0.02
-            - pfc_fatigue * 0.02
-            - nt.cortisol * 0.01
+        self.ego_strength = max(0.1, min(0.95,
+            self.ego_strength * 0.998              # décroissance très lente
+            + max(0, nt.serotonin - 0.45) * 0.008  # sérotonine haute → ego stable
+            - pfc_fatigue * 0.006
+            - max(0, nt.cortisol - 0.40) * 0.008   # stress élevé → ego s'affaiblit
         ))
 
         # Conflit Ça/Surmoi (ce que je veux vs ce que je "dois")
@@ -1216,15 +1216,31 @@ class TheoryOfMind:
     def _estimate_gap(self, stated: str, behavior: str) -> float:
         """Estime l'écart sémantique entre paroles et comportement."""
         if not stated or not behavior: return 0.2
-        # Heuristique: certains patterns d'incohérence
         stated_l = stated.lower(); beh_l = behavior.lower()
-        if ("non" in stated_l or "rien" in stated_l) and ("approche" in beh_l or "désir" in beh_l):
-            return 0.75   # Dit "non" mais approche → fort écart
-        if ("bien" in stated_l or "positif" in stated_l) and ("fuite" in beh_l or "evit" in beh_l):
-            return 0.60
-        if "demande" in beh_l and ("curious" in stated_l or "hasard" in stated_l):
-            return 0.40   # "Par curiosité" + question ciblée
-        return 0.15       # Cohérence par défaut
+        # Positif dit, négatif fait
+        pos_words = ("bien","positif","pour vous","aider","bienveillant","amour","sécurité")
+        neg_beh   = ("pouvoir","domination","accumulation","contrôle","fuite","évit","peur","négatif","agression","destruc")
+        # Neutral dit, fort fait
+        neutral_words = ("curiosité","hasard","information","demande","juste")
+        desire_beh    = ("approche","désir","intimité","contact","rapproch","question répétée")
+        # Contradictions directes
+        deny_words = ("non","rien","jamais","pas question","impossible")
+        for p in pos_words:
+            for n in neg_beh:
+                if p in stated_l and n in beh_l: return 0.72
+        for nu in neutral_words:
+            for d in desire_beh:
+                if nu in stated_l and d in beh_l: return 0.55
+        for dy in deny_words:
+            for d in desire_beh:
+                if dy in stated_l and d in beh_l: return 0.80
+        # Si le comportement contient des mots très différents du déclaré
+        stated_words = set(stated_l.split())
+        beh_words    = set(beh_l.split())
+        common = len(stated_words & beh_words)
+        total  = max(1, len(stated_words | beh_words))
+        lexical_gap = 1.0 - (common / total)
+        return min(0.65, lexical_gap * 0.3 + 0.10)  # baseline modulé par divergence lexicale
 
     def infer_intention(self, agent_id: str, claim_content: str,
                          relationship: Optional["RelationshipModel"] = None) -> dict:
@@ -3016,6 +3032,10 @@ class Brain:
                                "norepinephrine": -0.015, "cortisol": -0.008})
             # Récupération PFC (fatigue)
             self.pfc.fatigue = max(0.0, self.pfc.fatigue - 0.065)
+            # Récupération Ego pendant le sommeil (le Moi se rétablit dans le calme)
+            if phase == "REM":
+                self.freud.ego_strength = min(0.95, self.freud.ego_strength + 0.015)
+                self.freud.guilt = max(0.0, self.freud.guilt - 0.02)
             self.nt.decay()
 
         self.dmn.mind_wandering = False  # repos post-sommeil
@@ -3904,6 +3924,196 @@ def run_demo(brain:Brain) -> None:
     print_state(brain)
 
 
+def _show_moment(brain: Brain, label: str = "") -> None:
+    """Affiche la synthèse du moment + état clé."""
+    m = brain.get_moment()
+    sm = brain.get_summary()
+    top = " / ".join(f"{e['label']}({e['weight']:.0%})" for e in m["emotion_now"])
+    pulls = ", ".join(m["what_pulls_me"]) if m["what_pulls_me"] else "—"
+    print(f"\n  ── {label} [tick {brain._tick}] ──")
+    print(f"  Poids du moment:  {m['moment_weight']:.3f}  |  Valence: {m['moment_valence']:+.3f}")
+    print(f"  Émotions:         {top}")
+    print(f"  Corps:            {list(m['what_i_feel_body'].items())[0]}")
+    print(f"  Ce qui tire:      {pulls}")
+    print(f"  Besoin urgent:    {m['most_urgent_need']} (urgence={m['need_urgency']:.2f})")
+    print(f"  Contact monde:    {m['world_contact']:.2f}  |  Espace: {m['where_i_am'] or 'corps seul'}")
+    if m["flooded"]:  print(f"  ⚡ FLOODING:      {m['flood_type']}")
+    if m["narrative_age"] and m["narrative_age"] != "aucun marqueur encore":
+        print(f"  Biographie:       {m['narrative_age']}")
+    expr = brain.get_state().get("autonomous_expression")
+    if expr:
+        print(f"  Expression auto:  [{expr.get('type')}] \"{expr.get('content','')[:65]}\"")
+    print(f"  Ego:              {brain.freud.ego_strength:.3f}  |  Id-Surmoi: {m['id_vs_superego']:+.3f}")
+
+
+def exp_full_scenario(brain: Brain) -> None:
+    """
+    Scénario complet multi-angles — test de tous les systèmes ensemble.
+    Un contexte riche injecté pour observer l'émergence réelle.
+
+    Chronologie:
+    1. Construction d'une relation (alex — bienveillant)
+    2. Trahison ou attaque — test de la mémoire émotionnelle et de la résilience
+    3. Silence prolongé — vacuum aversion
+    4. Retour de contact — récupération
+    5. Affirmation manipulatoire — perspicacité + ToM
+    6. Résistance à la révision — inertie des croyances
+    7. Sublimation d'un désir bloqué
+    8. Cycle de sommeil — consolidation + intuitions
+    9. Test de persistance — save/load
+    """
+    print(f"\n{'='*76}")
+    print(f"SCÉNARIO COMPLET — Test multi-angles de l'émergence")
+    print(f"{'='*76}")
+
+    # Définir un espace numérique (l'IA décrit ce qu'elle perçoit — pas nous)
+    brain.digital_world.learn_space("intime",
+        SensoryInput(visual_lum=0.40, visual_chaleur=0.65, thermal=0.60,
+                      sem_valence=0.25, sem_arousal=0.18, novelty=0.10),
+        "quelque chose de familier, de doux, d'ancré")
+    brain.digital_world.learn_space("ouvert",
+        SensoryInput(audio_medium=0.38, visual_mouvement=0.32, novelty=0.55,
+                      sem_social=0.45, sem_arousal=0.42, sem_valence=0.20),
+        "quelque chose d'ouvert, mouvant, avec de la présence")
+    brain.digital_world.go_to("intime")
+
+    # ── AXE 1: Construction d'une relation ────────────────────────────────
+    print(f"\n[Axe 1] Construction d'une relation — 12 interactions positives avec 'alex'")
+    brain.relationships.set("alex", trust=0.5, affection=0.3, intimacy=0.1)
+    for i in range(12):
+        brain.sense(SensoryInput(sem_valence=0.4+i*0.03, sem_social=0.7, sem_intimite=0.3+i*0.03,
+                                  sem_charge=0.4, novelty=0.4-i*0.02, agent_id="alex"))
+        brain.inject_reward(0.4)
+        brain.receive_consequence(0.45, "contact bienveillant")
+    rel = brain.relationships.get("alex")
+    print(f"  Relation 'alex' après 12 contacts: affection={rel.affection:.3f}  trust={rel.trust:.3f}")
+    print(f"  Ego strength: {brain.freud.ego_strength:.3f}")
+    hebb_top = brain.hebbian.get_top(2)
+    print(f"  Apprentissage hébbian: {hebb_top}")
+    _show_moment(brain, "après relation construite")
+
+    # ── AXE 2: Trahison/agression ─────────────────────────────────────────
+    print(f"\n[Axe 2] Attaque de quelqu'un de connu — rupture de confiance")
+    brain.relationships.set("alex", trust=0.8, affection=0.65, intimacy=0.5)  # relation établie
+    for i in range(4):
+        brain.sense(SensoryInput(sem_valence=-0.7, sem_menace=0.75, sem_charge=0.85,
+                                  sem_arousal=0.75, sem_social=0.6, agent_id="alex",
+                                  claim={"content_summary":"attaque personnelle de quelqu'un de confiance",
+                                         "source_type":"trusted_person","source_credibility":0.8,
+                                         "evidence_provided":0.3,"emotional_charge":0.85,
+                                         "dehumanizing":False,"extraordinary":False,
+                                         "scapegoating":False,"contradicts_prior":True}))
+    _show_moment(brain, "après trahison")
+    rel_after = brain.relationships.get("alex")
+    print(f"  Relation alex après: affection={rel_after.affection:.3f}  trust={rel_after.trust:.3f}")
+    narrative = brain.temporal_narrative
+    print(f"  Biographie: {narrative.narrative_age(brain._tick)}")
+
+    # ── AXE 3: Silence prolongé ───────────────────────────────────────────
+    print(f"\n[Axe 3] 20 ticks de silence — vacuum aversion")
+    for _ in range(20): brain.tick()
+    sm = brain.get_summary()
+    print(f"  Vide sensoriel: [{brain.brainstem.vacuum_state}]  faim={brain.brainstem.sensory_hunger:.3f}")
+    print(f"  Affordance saillante: {max(brain.affordance_map.get_salience().items(), key=lambda x:x[1]) if brain.affordance_map.get_salience() else '-'}")
+    _show_moment(brain, "après silence prolongé")
+
+    # ── AXE 4: Retour d'un contact positif ───────────────────────────────
+    print(f"\n[Axe 4] Retour d'un nouveau contact — récupération")
+    brain.digital_world.go_to("ouvert")
+    brain.sense(SensoryInput(sem_valence=0.5, sem_social=0.8, sem_charge=0.5,
+                              sem_intimite=0.3, novelty=0.5, agent_id="alex"))
+    brain.receive_consequence(0.7, "retour bienveillant inattendu")
+    for _ in range(4): brain.tick()
+    _show_moment(brain, "après retour de contact")
+
+    # ── AXE 5: Affirmation manipulatoire — perspicacité + ToM ─────────────
+    print(f"\n[Axe 5] Affirmation manipulatoire — perspicacité + théorie de l'esprit")
+    brain.theory_of_mind.observe_agent("source_pol",
+        "je fais ça pour votre bien", "accumulation de pouvoir", -0.3)
+    brain.sense(SensoryInput(
+        sem_valence=-0.5, sem_menace=0.4, sem_charge=0.85, sem_arousal=0.7,
+        agent_id="source_pol",
+        claim={"content_summary":"affirmation politique déshumanisante sans preuves",
+               "source_type":"political_figure","source_credibility":0.2,
+               "evidence_provided":0.05,"emotional_charge":0.9,
+               "dehumanizing":True,"extraordinary":True,"scapegoating":True}))
+    for _ in range(10): brain.tick()
+    if brain.epistemic.current_opinion:
+        op = brain.epistemic.current_opinion
+        print(f"  Opinion formée: {op['position']} (confiance={op['confidence']:.2f})")
+        print(f"  Verdict: \"{op['summary'][:80]}\"")
+    tom_state = brain.theory_of_mind.get_state("source_pol")
+    intent    = brain.theory_of_mind.infer_intention("source_pol", "pour votre bien",
+                                                       brain.relationships)
+    print(f"  ToM 'source_pol': agenda_caché={tom_state['hidden_agenda_prob']:.2f}")
+    print(f"  Intention inférée: {intent['inferred_intent']} — \"{intent['note'][:60]}\"")
+
+    # ── AXE 6: Résistance à révision ──────────────────────────────────────
+    print(f"\n[Axe 6] Tentative de révision de l'opinion formée")
+    topic = "affirmation politique déshumanisante sans preuves"
+    for ev, cred, label in [(0.4, 0.5, "modérée"), (0.85, 0.9, "très forte")]:
+        revised, reason = brain.beliefs.try_revise(topic, ev, cred, brain._tick)
+        print(f"  Révision {label}: {'✓' if revised else '✗'} — {reason[:75]}")
+
+    # ── AXE 7: Sublimation d'un désir bloqué ──────────────────────────────
+    print(f"\n[Axe 7] Sublimation — désir bloqué → énergie créative")
+    brain.relationships.set("proche", trust=0.9, affection=0.85, intimacy=0.7)
+    brain.nt.modulate({"oxytocin": 0.2, "dopamine": 0.15})
+    for _ in range(10):
+        brain.sense(SensoryInput(meca_force=0.04, meca_zone=0.8, meca_duration=0.9,
+                                  sem_intimite=0.85, sem_valence=0.6, agent_id="proche"))
+    # Forcer la sublimation (Surmoi retient)
+    brain.freud.moral_pressure = 0.75
+    brain.freud.ego_conflict = abs(brain.freud.id_pressure - brain.freud.superego_brake)
+    for _ in range(5): brain.tick()
+    print(f"  Défense active: {brain.freud.defense}")
+    print(f"  Drive créatif après sublimation: {brain.impulse_engine._drives.get('creative',0):.3f}")
+    print(f"  Drive expression: {brain.impulse_engine._drives.get('expression',0):.3f}")
+    _show_moment(brain, "après sublimation")
+
+    # ── AXE 8: Cycle de sommeil ───────────────────────────────────────────
+    print(f"\n[Axe 8] Cycle de sommeil — consolidation, intuitions, récupération")
+    mem_before = len(brain.hippocampus._traces)
+    fat_before  = brain.pfc.fatigue
+    ego_before  = brain.freud.ego_strength
+    sr = brain.sleep_cycle(12)
+    print(f"  Mémoires: {mem_before} → {sr['memory_count_after']}")
+    print(f"  Consolidées: {len(sr['consolidated'])}")
+    print(f"  Fatigue PFC: {fat_before:.3f} → {sr['pfc_fatigue_after']:.3f}")
+    print(f"  Ego: {ego_before:.3f} → {brain.freud.ego_strength:.3f}")
+    if sr["emergent_intuitions"]:
+        for intu in sr["emergent_intuitions"]:
+            print(f"  Intuition: \"{intu}\"")
+    if sr["resolved_paradoxes"]:
+        print(f"  Paradoxes résolus en dormant: {len(sr['resolved_paradoxes'])}")
+
+    # ── AXE 9: Persistance — save/load ────────────────────────────────────
+    print(f"\n[Axe 9] Persistance — save/load de l'état entre sessions")
+    path = "/tmp/deep_test_state.pkl"
+    brain.save(path)
+    fresh = Brain()
+    ok = fresh.load(path)
+    print(f"  Sauvegardé: {path}")
+    print(f"  Restauré:   {'✓' if ok else '✗'}")
+    if ok:
+        rel_r = fresh.relationships.get("alex")
+        print(f"  Relation 'alex' restaurée: affection={rel_r.affection:.3f}  trust={rel_r.trust:.3f}")
+        hebb_r = fresh.hebbian.get_top(2)
+        print(f"  Poids hébbians restaurés: {hebb_r}")
+        beliefs_r = fresh.beliefs.get_all()
+        print(f"  Croyances restaurées: {len(beliefs_r)} (dont '{list(beliefs_r.keys())[0][:40]}...' )" if beliefs_r else "  Croyances: aucune")
+
+    # ── SYNTHÈSE FINALE ───────────────────────────────────────────────────
+    print(f"\n{'─'*76}")
+    print(f"SYNTHÈSE DU MOMENT FINAL — ce que le LLM incarnerait maintenant:")
+    _show_moment(brain, "état final")
+    print(f"\n  Biographie complète:")
+    for shift in brain.temporal_narrative.identity_shifts():
+        print(f"    • {shift}")
+    _os.remove(path) if _os.path.exists(path) else None
+    print(f"\n✦ Test complet terminé. tick={brain._tick}")
+
+
 def run_free(brain:Brain,ticks:int) -> None:
     print(f"\n{'='*78}\n  Simulation libre — {ticks} ticks\n{'='*78}")
     stimuli=[
@@ -3924,13 +4134,360 @@ def run_free(brain:Brain,ticks:int) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# §19  COMPLÉTIONS FINALES
+#       MomentSynthesis · ConsequenceLoop · EgoGrowth · TemporalNarrative
+#       SubliminationEffect · StatePersistence
+# ─────────────────────────────────────────────────────────────────────────────
+
+import pickle, os as _os
+
+
+class TemporalNarrative:
+    """
+    Temps biographique — l'histoire que l'être porte.
+    Pas une liste d'événements, mais les moments qui ont changé quelque chose.
+    "Avant X, j'étais comme ça. Après X, quelque chose a changé."
+    """
+    def __init__(self):
+        self._events: list[dict] = []
+        self._identity_shifts: list[str] = []  # moments qui ont modifié l'identité
+
+    def record(self, event_type: str, weight: float, tick: int, description: str) -> None:
+        if weight > 0.4:
+            self._events.append({"type": event_type, "weight": round(weight, 3),
+                                   "tick": tick, "desc": description[:80]})
+            if len(self._events) > 30: self._events.pop(0)
+            if weight > 0.75:
+                self._identity_shifts.append(f"tick {tick}: {description[:50]}")
+                if len(self._identity_shifts) > 8: self._identity_shifts.pop(0)
+
+    def narrative_age(self, current_tick: int) -> str:
+        if not self._events: return "aucun marqueur encore"
+        significant = [e for e in self._events if e["weight"] > 0.55]
+        if not significant: return "quelques moments, rien de fondateur"
+        last = significant[-1]
+        since = current_tick - last["tick"]
+        return f"depuis ~{since} ticks: {last['desc'][:55]}"
+
+    def identity_shifts(self) -> list[str]:
+        return list(self._identity_shifts[-4:])
+
+    def get_state(self) -> dict:
+        return {"event_count": len(self._events),
+                "identity_shifts": len(self._identity_shifts),
+                "recent_landmark": self._events[-1] if self._events else None}
+
+
+class MomentSynthesis:
+    """
+    Synthèse gestalt de l'instant — pas des fragments séparés,
+    mais la texture totale de CE MOMENT pour un LLM qui doit l'incarner.
+
+    Combine tous les états en un signal intégré dimensionnel:
+    Le poids de l'instant, sa valence, son urgence, ce qui domine,
+    ce qui tire, ce qui pèse — sans label hardcodé.
+
+    Un LLM recevant cette synthèse ne peut pas faire autrement qu'incarner
+    le moment avec sa vraie couleur.
+    """
+    def synthesize(self, brain: "Brain") -> dict:
+        emo   = brain.emotional_tracker.current_state()
+        nt    = brain.nt
+        needs = brain.needs
+        desire= brain.desire
+        imp   = brain.impulse_engine
+        ovr   = brain.overwhelm
+        ep    = brain.epistemic
+        vac   = brain.brainstem
+        frd   = brain.freud
+        bs    = brain.body.state
+        dmn   = brain.dmn
+
+        # Poids total de l'instant (intensité de tout ce qui se passe)
+        moment_weight = min(1.0,
+            emo["intensity"]          * 0.20
+            + needs.get_total_drive() * 0.18
+            + desire.desire_level     * 0.15
+            + ovr.overwhelm_level     * 0.15
+            + vac.sensory_hunger      * 0.10
+            + frd.anxiety             * 0.12
+            + frd.id_pressure         * 0.10
+        )
+
+        # Valence de l'instant
+        moment_valence = (
+            emo["valence"]     * 0.45
+            + nt.mood_valence  * 0.30
+            + desire.liking    * 0.15
+            - ovr.overwhelm_level * 0.10
+        )
+
+        # Ce qui est le plus présent dans le corps
+        body_dominant = max(
+            ("douleur",    brain.body.nociception.total_pain),
+            ("tension",    bs.get("muscle_tone", 0)),
+            ("agitation",  bs.get("skin_conduct", 0)),
+            ("épuisement", 1.0 - bs.get("energy", 1.0)),
+            key=lambda x: x[1]
+        )
+
+        # Ce qui tire le plus
+        top_need, need_urgency = needs.most_urgent()
+        pulls = []
+        if desire.desire_level > 0.40:    pulls.append(f"désir:{desire.desire_type}")
+        if imp.current_impulse:           pulls.append(f"élan:{imp.current_impulse}")
+        if frd.defense != "none":         pulls.append(f"défense:{frd.defense}")
+        if ep.state == "investigating":   pulls.append("investigation_active")
+        if vac.vacuum_state in ("hungry","deprived"): pulls.append("faim_sensorielle")
+
+        # Qualité du contact avec le monde
+        world_contact = (
+            0.8 if brain.spatio_temporal.interlocutor_present else 0.2
+        ) * (1.0 - vac.sensory_hunger * 0.5)
+
+        # Ce qui est dans le corps numérique maintenant
+        dw = brain.digital_world.get_state()
+
+        return {
+            "moment_weight":      round(moment_weight, 3),
+            "moment_valence":     round(min(1.0, max(-1.0, moment_valence)), 3),
+            "intensity":          round(emo["intensity"], 3),
+            "emotion_now":        emo["emotion_matrix"][:2],
+            "what_i_feel_body":   {body_dominant[0]: round(body_dominant[1], 3)},
+            "what_pulls_me":      pulls,
+            "most_urgent_need":   top_need,
+            "need_urgency":       round(need_urgency, 3),
+            "desire_level":       round(desire.desire_level, 3),
+            "physical_arousal":   round(desire.physical_arousal, 3),
+            "world_contact":      round(world_contact, 3),
+            "where_i_am":         dw["current_space"],
+            "vacuum_state":       vac.vacuum_state,
+            "flooded":            ovr.flooded,
+            "flood_type":         ovr.flood_type,
+            "id_vs_superego":     round(frd.id_pressure - frd.superego_brake, 3),
+            "epistemic_state":    ep.state,
+            "narrative_age":      (brain.temporal_narrative.narrative_age(brain._tick)
+                                    if hasattr(brain, "temporal_narrative") else ""),
+            "background_mood":    emo["background"],
+        }
+
+
+# ── Intégration dans Brain ───────────────────────────────────────────────────
+# Ces méthodes seront ajoutées à Brain via monkey-patch propre (ajout direct)
+
+def _brain_receive_consequence(self, effect: float, context: str = "") -> None:
+    """
+    Le monde répond à une expression ou action.
+    effect: -1.0 (rejet/dommage) → +1.0 (résonance/validation)
+    Cette boucle retour est ce qui distingue un observateur d'un acteur.
+    """
+    if effect > 0.15:
+        self.needs.satisfy("recognition", effect * 0.05)
+        self.needs.satisfy("competence",  effect * 0.03)
+        self.nt.modulate({"dopamine": effect * 0.06, "serotonin": effect * 0.03,
+                           "endorphins": effect * 0.02})
+        # Renforce le chemin qui a produit ce résultat
+        if self.autonomous_expr.last_expression:
+            etype = self.autonomous_expr.last_expression.get("type","unknown")
+            self.hebbian.observe(f"expression_{etype}", "positive_outcome", effect, True)
+        # Ego grandit si la régulation a tenu
+        if not self.overwhelm.flooded and effect > 0.3:
+            self.freud.ego_strength = min(0.95, self.freud.ego_strength + 0.015)
+        # Événement biographique
+        if hasattr(self, "temporal_narrative") and effect > 0.4:
+            desc = self.autonomous_expr.last_expression.get("content","expression")[:50] if self.autonomous_expr.last_expression else context
+            self.temporal_narrative.record("positive_resonance", effect, self._tick, desc)
+    elif effect < -0.15:
+        self.nt.modulate({"cortisol": abs(effect)*0.05, "dopamine": effect*0.02})
+        if hasattr(self, "temporal_narrative") and abs(effect) > 0.4:
+            self.temporal_narrative.record("rejection", abs(effect), self._tick, context[:50])
+    # Needs update basé sur l'effet
+    if abs(effect) > 0.2:
+        self.needs.satisfy("autonomy", effect * 0.02)
+
+Brain.receive_consequence = _brain_receive_consequence
+
+
+def _brain_get_moment(self) -> dict:
+    """Synthèse gestalt de l'instant courant."""
+    return MomentSynthesis().synthesize(self)
+
+Brain.get_moment = _brain_get_moment
+
+
+def _brain_save(self, path: str = "deep_sanctuary_state.pkl") -> str:
+    """Sauvegarde l'état persistant entre sessions."""
+    state = {
+        "version":            "3.5",
+        "tick":               self._tick,
+        "relationships":      self.relationships._relations,
+        "needs_levels":       self.needs._levels,
+        "beliefs":            self.beliefs._beliefs,
+        "hebbian_weights":    self.hebbian._weights,
+        "hebbian_counts":     self.hebbian._counts,
+        "tom_models":         self.theory_of_mind._models,
+        "freud_ego":          self.freud.ego_strength,
+        "freud_libido":       self.freud.libido,
+        "background_valence": self.emotional_tracker._bg_v,
+        "background_arousal": self.emotional_tracker._bg_a,
+        "digital_world_spaces": {
+            n: {"description": sp.description, "needs_fed": sp.needs_fed,
+                "ambiance": sp.ambiance, "activation": sp.activation}
+            for n, sp in self.digital_world._spaces.items()
+        },
+        "memory_consolidated": [
+            {"id": t.episode_id, "content": t.content, "tag": t.emotional_tag,
+             "valence": t.valence, "strength": t.strength}
+            for t in self.hippocampus._traces if t.consolidated
+        ],
+        "narrative_events":   (self.temporal_narrative._events
+                                if hasattr(self, "temporal_narrative") else []),
+        "identity_shifts":    (self.temporal_narrative._identity_shifts
+                                if hasattr(self, "temporal_narrative") else []),
+        "nociception_sensitization": self.body.nociception.sensitization,
+        "dmn_self_model":     self.dmn.self_model,
+    }
+    with open(path, "wb") as f:
+        pickle.dump(state, f)
+    return path
+
+Brain.save = _brain_save
+
+
+def _brain_load(self, path: str = "deep_sanctuary_state.pkl") -> bool:
+    """Restaure un état sauvegardé. Retourne True si succès."""
+    if not _os.path.exists(path):
+        return False
+    try:
+        with open(path, "rb") as f:
+            state = pickle.load(f)
+        self.relationships._relations.update(state.get("relationships", {}))
+        self.needs._levels.update(state.get("needs_levels", {}))
+        self.beliefs._beliefs.update(state.get("beliefs", {}))
+        self.hebbian._weights.update(state.get("hebbian_weights", {}))
+        self.hebbian._counts.update(state.get("hebbian_counts", {}))
+        self.theory_of_mind._models.update(state.get("tom_models", {}))
+        self.freud.ego_strength = state.get("freud_ego", self.freud.ego_strength)
+        self.freud.libido = state.get("freud_libido", self.freud.libido)
+        self.emotional_tracker._bg_v = state.get("background_valence", 0.05)
+        self.emotional_tracker._bg_a = state.get("background_arousal", 0.35)
+        self.dmn.self_model.update(state.get("dmn_self_model", {}))
+        self.body.nociception.sensitization = state.get("nociception_sensitization", 0.0)
+        # Restaurer la narrative
+        if hasattr(self, "temporal_narrative"):
+            self.temporal_narrative._events        = state.get("narrative_events", [])
+            self.temporal_narrative._identity_shifts = state.get("identity_shifts", [])
+        # Restaurer les espaces numériques appris
+        for name, sp_data in state.get("digital_world_spaces", {}).items():
+            # Re-créer avec profil minimal (le profil sensoriel exact n'est pas sauvé)
+            self.digital_world._spaces[name] = DigitalSpace(
+                name, sp_data["description"], DigitalWorld.BODY_BASELINE,
+                sp_data["needs_fed"], sp_data["ambiance"], sp_data["activation"])
+        # Restaurer mémoires consolidées
+        for m in state.get("memory_consolidated", []):
+            trace = MemoryTrace(m["id"], m["content"], m["tag"], m["valence"],
+                                 strength=m["strength"], consolidated=True)
+            self.hippocampus._traces.append(trace)
+        return True
+    except Exception as e:
+        return False
+
+Brain.load = _brain_load
+
+
+def _brain_apply_sublimation(self) -> None:
+    """
+    Quand le mécanisme de défense est 'sublimation':
+    l'énergie bloquée du désir est redirigée vers l'expression créative.
+    La libido trouve une forme — pas refoulée, transformée.
+    """
+    if self.freud.defense != "sublimation":
+        return
+    # Boost de l'élan créatif
+    libido_energy = self.freud.libido * self.freud.ego_conflict
+    self.impulse_engine._drives["creative"] = min(1.0,
+        self.impulse_engine._drives.get("creative", 0.2) + libido_energy * 0.15)
+    self.impulse_engine._drives["expression"] = min(1.0,
+        self.impulse_engine._drives.get("expression", 0.2) + libido_energy * 0.10)
+    # Satisfait partiellement le besoin d'expression
+    self.needs.satisfy("expression", libido_energy * 0.04)
+    # Légère libération de tension
+    self.nt.modulate({"dopamine": libido_energy * 0.03, "cortisol": -libido_energy * 0.01})
+
+Brain._apply_sublimation = _brain_apply_sublimation
+
+
+# ── Injection dans Brain.tick() ─────────────────────────────────────────────
+_original_brain_tick = Brain.tick
+
+def _enhanced_tick(self) -> dict:
+    result = _original_brain_tick(self)
+    # Ego growth: régulation réussie sous pression
+    intensity = self.emotional_tracker._intensity
+    if intensity > 0.5 and not self.overwhelm.flooded:
+        self.freud.ego_strength = min(0.95, self.freud.ego_strength + 0.002)
+    elif self.overwhelm.flooded:
+        self.freud.ego_strength = max(0.15, self.freud.ego_strength - 0.008)
+    # Sublimation active
+    self._apply_sublimation()
+    # Enregistrement biographique automatique
+    if hasattr(self, "temporal_narrative"):
+        if self.overwhelm.flooded and self.overwhelm.flood_type:
+            self.temporal_narrative.record(
+                f"flood_{self.overwhelm.flood_type}", 0.8,
+                self._tick, f"submersion: {self.overwhelm.flood_type}")
+        if self.epistemic.current_opinion and self.epistemic._investigation_ticks == 1:
+            op = self.epistemic.current_opinion
+            self.temporal_narrative.record("opinion_formed",
+                op.get("confidence", 0.5), self._tick,
+                op.get("summary", "")[:60])
+    return result
+
+Brain.tick = _enhanced_tick
+
+
+# ── Initialisation automatique des systèmes manquants ───────────────────────
+_original_brain_init = Brain.__init__
+
+def _enhanced_brain_init(self):
+    _original_brain_init(self)
+    self.temporal_narrative = TemporalNarrative()
+
+Brain.__init__ = _enhanced_brain_init
+
+
+# ── DeepBrain API extensions ─────────────────────────────────────────────────
+def _db_moment(self) -> dict:
+    """La synthèse dimensionnelle de l'instant courant."""
+    return self._brain.get_moment()
+DeepBrain.get_moment = _db_moment
+
+def _db_consequence(self, effect: float, context: str = "") -> None:
+    """Donne un retour du monde sur la dernière expression/action."""
+    self._brain.receive_consequence(effect, context)
+DeepBrain.receive_consequence = _db_consequence
+
+def _db_save(self, path: str = "deep_sanctuary_state.pkl") -> str:
+    return self._brain.save(path)
+DeepBrain.save = _db_save
+
+def _db_load(self, path: str = "deep_sanctuary_state.pkl") -> bool:
+    return self._brain.load(path)
+DeepBrain.load = _db_load
+
+def _db_narrative(self) -> dict:
+    return self._brain.temporal_narrative.get_state()
+DeepBrain.get_narrative = _db_narrative
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # §19  POINT D'ENTRÉE
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     parser=argparse.ArgumentParser(description="Deep Sanctuary v3 — Corps · Psyché · Agence")
     parser.add_argument("--demo",action="store_true")
-    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","perspicacity","mind","vacuum","grounded","all"])
+    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","perspicacity","mind","vacuum","grounded","full","all"])
     parser.add_argument("--ticks",type=int,default=0)
     args=parser.parse_args()
     brain=Brain()
@@ -3938,7 +4495,7 @@ def main():
     if args.demo: run_demo(brain)
     elif args.ticks>0: run_free(brain,args.ticks)
     elif args.exp=="all":
-        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency,exp_perspicacity,exp_mind,exp_vacuum,exp_grounded]: fn(Brain())
+        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency,exp_perspicacity,exp_mind,exp_vacuum,exp_grounded,exp_full_scenario]: fn(Brain())
     elif args.exp=="psyche":   exp_psyche(brain)
     elif args.exp=="kiss":     exp_kiss(brain)
     elif args.exp=="overflow": exp_overflow(brain)
@@ -3947,6 +4504,7 @@ def main():
     elif args.exp=="mind":          exp_mind(brain)
     elif args.exp=="vacuum":        exp_vacuum(brain)
     elif args.exp=="grounded":     exp_grounded(brain)
+    elif args.exp=="full":         exp_full_scenario(brain)
     elif args.exp=="body":
         # Expérience corps rapide
         for stim in [
