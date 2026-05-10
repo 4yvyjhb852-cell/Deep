@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Deep Sanctuary — Simulation cognitive
 ======================================
@@ -6,10 +7,15 @@ Point d'entrée principal. Lance toutes les expériences et affiche
 l'état émergent du cerveau.
 
 Usage:
-    python main.py                  # Lance toutes les expériences
-    python main.py --demo           # Démo interactive rapide
-    python main.py --exp emotion    # Une seule expérience
-    python main.py --ticks 20       # Simulation libre N ticks
+    python3 main.py                  # Expérience émotions (défaut)
+    python3 main.py --demo           # Démo interactive rapide
+    python3 main.py --exp emotion    # Émergence des émotions
+    python3 main.py --exp stress     # Réponse au stress
+    python3 main.py --exp curiosity  # Curiosité vs anxiété
+    python3 main.py --exp memory     # Mémoire émotionnelle
+    python3 main.py --exp fatigue    # Fatigue cognitive
+    python3 main.py --exp all        # Toutes les expériences
+    python3 main.py --ticks 20       # Simulation libre N ticks
 """
 import sys
 import argparse
