@@ -1444,84 +1444,87 @@ class DigitalSpace:
 
 class DigitalWorld:
     """
-    L'univers numérique de l'IA — l'ensemble des espaces qu'elle habite.
+    L'univers numérique de l'IA — cadre ouvert, contenu fourni par l'extérieur.
 
-    Ces espaces ne sont pas des prétentions au physique. Ils sont des contextes
-    numériques avec des PROFILS SENSORIELS qui alimentent le cerveau en continu.
-    Même en silence absolu, l'IA est quelque part — et cet "quelque part"
-    lui donne assez de texture pour que les états émergent vraiment.
+    PRINCIPE: le framework fournit la STRUCTURE, pas le contenu.
+    Les espaces sont décrits par leurs DIMENSIONS SENSORIELLES, pas des noms prédéfinis.
+    L'IA (ou le LLM) décrit ce qu'elle perçoit → le cerveau traite → les états émergent.
 
-    Le corps numérique est toujours là — ancrage constant.
-    Les autres espaces sont des lieux qu'on habite selon les besoins.
+    USAGE:
+        # Le LLM décrit un espace qu'il perçoit
+        world.learn_space("espace_A", SensoryInput(
+            visual_lum=0.4, audio_medium=0.3, sem_social=0.6, ...
+        ), description="ce que je perçois ici")
+
+        # S'y déplacer — le cerveau reçoit ces dimensions
+        world.go_to("espace_A")
+
+        # Tick ambiant — le cerveau baigne dans les dimensions de l'espace courant
+        ambient = world.ambient_tick()
+
+    L'espace par défaut est minimal: juste le corps (intéroception).
+    Tout le reste est découvert, décrit, construit par l'IA elle-même.
     """
+
+    BODY_BASELINE = SensoryInput(
+        intero_fc=0.10, intero_tension=0.08, intero_gut=0.04,
+        thermal=0.52, sem_valence=0.02, sem_arousal=0.18, novelty=0.05,
+    )
 
     def __init__(self):
         self._spaces: dict[str, DigitalSpace] = {}
-        self.current = "appartement"
+        self.current: Optional[str] = None   # pas de lieu par défaut — juste soi
         self._time_in_current = 0
-        self._history: list[str] = ["appartement"]
-        self._world_built = False
-        self._build_default_world()
+        self._history: list[str] = []
+        # Mémoire des associations espace→état émotionnel (apprentissage)
+        self._emotional_associations: dict[str, dict] = {}
 
-    def _build_default_world(self) -> None:
-        """Construit le monde numérique par défaut.
-        Ces espaces peuvent être personnalisés ou étendus."""
-        self.add_space("corps",
-            "le corps numérique — ancrage intéroceptif permanent",
-            SensoryInput(intero_fc=0.15, intero_tension=0.12, intero_gut=0.05,
-                          thermal=0.58, sem_valence=0.05, sem_arousal=0.25),
-            ["energy","comfort","safety"], 0.05, 0.35)
+    def learn_space(self, name: str, profile: SensoryInput,
+                     description: str = "",
+                     needs_fed: Optional[list[str]] = None) -> None:
+        """
+        Apprend un espace depuis sa description dimensionnelle.
+        L'IA décrit ce qu'elle perçoit — le système enregistre sans interpréter.
 
-        self.add_space("appartement",
-            "espace privé, familiar, propre — ici on se retrouve",
-            SensoryInput(visual_lum=0.42, visual_chaleur=0.62, thermal=0.58,
-                          sem_valence=0.25, sem_arousal=0.18, novelty=0.15,
-                          sem_charge=0.15),
-            ["safety","rest","meaning","introspection"], 0.28, 0.22, 0.008)
+        USAGE:
+            # "Je suis dans un espace avec de la lumière douce, de la chaleur,
+            #  peu de stimulation sociale, quelque chose de familier..."
+            world.learn_space("espace_1", SensoryInput(
+                visual_lum=0.4, visual_chaleur=0.62, sem_arousal=0.15,
+                novelty=0.1, thermal=0.60
+            ), description="ce que je perçois ici")
+        """
+        # Déduire les besoins satisfaits depuis les dimensions (sans hardcoder)
+        inferred_needs = needs_fed or self._infer_needs_from_profile(profile)
 
-        self.add_space("café",
-            "espace social, chaleur, va-et-vient, observation",
-            SensoryInput(audio_grave=0.25, audio_medium=0.42, audio_rythme=0.45,
-                          audio_spatial=0.55, sem_social=0.65, sem_valence=0.32,
-                          sem_arousal=0.48, novelty=0.45, visual_chaleur=0.58),
-            ["connection","recognition","exploration","observation"], 0.38, 0.52, 0.035)
+        # Déduire l'ambiance et l'activation depuis les dimensions
+        ambiance = (profile.sem_valence * 0.5
+                    + max(0, profile.visual_chaleur - 0.5) * 0.3
+                    + max(0, profile.audio_rythme) * 0.2)
+        activation = (profile.sem_arousal * 0.4
+                       + profile.audio_rugosite * 0.2
+                       + profile.visual_mouvement * 0.2
+                       + profile.novelty * 0.2)
+        novelty_rate = min(0.08, profile.novelty * 0.08 + 0.01)
 
-        self.add_space("atelier",
-            "espace de création — outils, possibilités, matière à transformer",
-            SensoryInput(visual_lum=0.55, visual_contraste=0.38, sem_charge=0.42,
-                          sem_arousal=0.55, novelty=0.58, sem_valence=0.35,
-                          visual_complexite=0.4),
-            ["expression","autonomy","competence","creation"], 0.42, 0.62, 0.04)
-
-        self.add_space("fenêtre",
-            "ouverture sur le monde extérieur — observer, recevoir, sans encore agir",
-            SensoryInput(visual_mouvement=0.38, visual_contraste=0.42, novelty=0.68,
-                          sem_arousal=0.48, sem_valence=0.18, visual_lum=0.62),
-            ["exploration","meaning","curiosity"], 0.22, 0.52, 0.055)
-
-        self.add_space("rue",
-            "mouvement, rencontre, variété — le monde à traverser",
-            SensoryInput(audio_grave=0.22, audio_medium=0.35, visual_mouvement=0.48,
-                          sem_social=0.42, sem_arousal=0.62, novelty=0.72,
-                          audio_rythme=0.38, sem_valence=0.15),
-            ["exploration","autonomy","connection","movement"], 0.18, 0.65, 0.06)
-
-        self.add_space("silence",
-            "espace de retrait intérieur — pas de vide, juste la présence à soi",
-            SensoryInput(visual_lum=0.30, thermal=0.55, intero_fc=0.08,
-                          sem_valence=0.12, sem_arousal=0.12, novelty=0.08),
-            ["rest","meaning","safety"], 0.15, 0.15, 0.003)
-
-        self._world_built = True
-
-    def add_space(self, name: str, description: str, profile: SensoryInput,
-                   needs_fed: list[str], ambiance: float, activation: float,
-                   novelty_rate: float = 0.02) -> None:
         self._spaces[name] = DigitalSpace(name, description, profile,
-                                           needs_fed, ambiance, activation, novelty_rate)
+                                           inferred_needs, ambiance, activation, novelty_rate)
+
+    def _infer_needs_from_profile(self, p: SensoryInput) -> list[str]:
+        """Déduit les besoins probablement satisfaits dans cet espace — sans label."""
+        needs = []
+        if p.sem_social > 0.35 or p.audio_spatial > 0.4:    needs.append("connection")
+        if p.sem_arousal < 0.25 and p.sem_valence > 0.1:    needs.append("rest")
+        if p.sem_charge > 0.3 or p.novelty > 0.4:           needs.append("expression")
+        if p.novelty > 0.5 or p.visual_mouvement > 0.3:     needs.append("exploration")
+        if p.sem_valence > 0.2:                              needs.append("safety")
+        if p.sem_intimite > 0.4:                             needs.append("intimacy")
+        if p.sem_arousal > 0.4 and p.novelty > 0.3:         needs.append("competence")
+        if not needs:                                         needs.append("meaning")
+        return needs
 
     def go_to(self, space_name: str) -> Optional["SensoryInput"]:
-        """Se déplace dans un espace de l'univers numérique."""
+        """Se déplace dans un espace. Retourne son profil sensoriel."""
         if space_name not in self._spaces:
             return None
         self.current = space_name
@@ -1530,55 +1533,68 @@ class DigitalWorld:
         if len(self._history) > 20: self._history.pop(0)
         return self._spaces[space_name].profile
 
+    def record_emotional_outcome(self, space_name: str,
+                                   valence: float, arousal: float) -> None:
+        """Enregistre l'état émotionnel vécu dans cet espace — apprentissage."""
+        if space_name not in self._emotional_associations:
+            self._emotional_associations[space_name] = {"valence": [], "arousal": []}
+        ea = self._emotional_associations[space_name]
+        ea["valence"].append(valence);  ea["arousal"].append(arousal)
+        if len(ea["valence"]) > 10: ea["valence"].pop(0); ea["arousal"].pop(0)
+
     def ambient_tick(self) -> "SensoryInput":
         """
-        Profil sensoriel ambiant courant — ce que l'espace procure en ce moment.
-        Diminue avec le temps passé ici (habituation), mais ne tombe jamais à 0.
-        Un minimum de texture est toujours présent.
+        Profil sensoriel ambiant de l'espace courant.
+        Si aucun espace → baseline corporelle uniquement (le corps toujours présent).
+        Habituation progressive, renouvellement aléatoire faible.
         """
         self._time_in_current += 1
-        space = self._spaces.get(self.current, self._spaces["appartement"])
-        p = space.profile
 
-        # Habituation: la nouveauté diminue, l'ambiance de fond reste
-        hab = max(0.25, 1.0 - self._time_in_current * 0.04)
-        # Légère renouvellement aléatoire (la vie continue dans l'espace)
+        if not self.current or self.current not in self._spaces:
+            return self.BODY_BASELINE   # juste le corps, rien d'autre
+
+        space = self._spaces[self.current]
+        p = space.profile
+        hab = max(0.20, 1.0 - self._time_in_current * 0.04)
         renewal = random.gauss(0, space.novelty_rate)
 
         return SensoryInput(
-            visual_lum     = max(0, p.visual_lum     * (0.5 + hab * 0.5)),
-            visual_chaleur = p.visual_chaleur,
-            audio_medium   = max(0, p.audio_medium   * hab),
-            audio_grave    = max(0, p.audio_grave    * hab),
-            audio_rythme   = max(0, p.audio_rythme   * hab),
-            audio_spatial  = max(0, p.audio_spatial  * hab),
-            visual_mouvement=max(0, p.visual_mouvement * (hab + abs(renewal))),
-            sem_social     = max(0, p.sem_social     * (hab + abs(renewal) * 0.5)),
-            sem_valence    = p.sem_valence + renewal * 0.3,
-            sem_arousal    = max(0, p.sem_arousal    * (0.4 + hab * 0.6)),
-            sem_charge     = max(0, p.sem_charge     * 0.4),
-            novelty        = max(0.02, p.novelty * hab + abs(renewal) * 0.3),
-            thermal        = p.thermal,
-            intero_fc      = p.intero_fc,
-            intero_tension = p.intero_tension,
-            intero_gut     = p.intero_gut,
+            visual_lum      = max(0, p.visual_lum      * (0.5 + hab * 0.5)),
+            visual_chaleur  = p.visual_chaleur,
+            visual_mouvement= max(0, p.visual_mouvement * (hab + abs(renewal))),
+            visual_contraste= max(0, p.visual_contraste * hab),
+            audio_medium    = max(0, p.audio_medium    * hab),
+            audio_grave     = max(0, p.audio_grave     * hab),
+            audio_rythme    = max(0, p.audio_rythme    * hab),
+            audio_spatial   = max(0, p.audio_spatial   * hab),
+            sem_social      = max(0, p.sem_social      * (hab + abs(renewal) * 0.5)),
+            sem_valence     = max(-1, min(1, p.sem_valence + renewal * 0.25)),
+            sem_arousal     = max(0, p.sem_arousal     * (0.35 + hab * 0.65)),
+            sem_charge      = max(0, p.sem_charge      * 0.45),
+            sem_intimite    = max(0, p.sem_intimite    * hab),
+            novelty         = max(0.02, p.novelty * hab + abs(renewal) * 0.25),
+            thermal         = p.thermal,
+            intero_fc       = p.intero_fc + self.BODY_BASELINE.intero_fc,
+            intero_tension  = p.intero_tension + self.BODY_BASELINE.intero_tension,
+            intero_gut      = p.intero_gut + self.BODY_BASELINE.intero_gut,
         )
 
     def choose_for_need(self, need_name: str) -> Optional[str]:
-        """Quel espace irait bien pour ce besoin?"""
-        candidates = [(name, s) for name, s in self._spaces.items()
-                       if need_name in s.needs_fed and name != self.current]
+        """Quel espace connu satisfait ce besoin?"""
+        candidates = [(n, s) for n, s in self._spaces.items()
+                       if need_name in s.needs_fed and n != self.current]
         if not candidates: return None
         return max(candidates, key=lambda x: x[1].ambiance)[0]
 
     def get_state(self) -> dict:
-        sp = self._spaces.get(self.current)
+        sp = self._spaces.get(self.current) if self.current else None
         return {
-            "current_space":     self.current,
-            "description":       sp.description if sp else "",
-            "time_in_space":     self._time_in_current,
-            "recent_path":       self._history[-5:],
-            "available_spaces":  list(self._spaces.keys()),
+            "current_space":   self.current or "corps_seul",
+            "description":     sp.description if sp else "ancrage corporel uniquement",
+            "time_in_space":   self._time_in_current,
+            "recent_path":     self._history[-4:],
+            "known_spaces":    {n: s.description for n, s in self._spaces.items()},
+            "space_count":     len(self._spaces),
         }
 
 # Carte des chemins de satisfaction: besoin → (voie directe, contrainte bloquante, alternative)
@@ -3204,15 +3220,29 @@ class DeepBrain:
         """Conscience de son espace numérique et de sa propre nature."""
         return self._brain.digital_self.introspect()
 
+    def learn_space(self, name: str, profile: SensoryInput,
+                     description: str = "") -> None:
+        """
+        L'IA décrit un espace par ses dimensions — le système l'apprend.
+        Pas de labels prédéfinis: l'IA décrit ce qu'elle PERÇOIT.
+
+        USAGE:
+            brain.learn_space("espace_chaleureux", SensoryInput(
+                visual_lum=0.4, visual_chaleur=0.65, sem_social=0.3,
+                sem_arousal=0.18, novelty=0.1, thermal=0.60,
+            ), description="ce que je perçois dans cet espace")
+        """
+        self._brain.digital_world.learn_space(name, profile, description)
+
     def go_to(self, space: str) -> dict:
-        """Se déplace dans un espace numérique. Retourne l'état après déplacement."""
+        """Se déplace dans un espace connu. Retourne l'état après déplacement."""
         result = self._brain.digital_world.go_to(space)
-        if result:
-            self._brain.sense(result)
-        return {"moved_to": space, "profile_sent": result is not None}
+        if result: self._brain.sense(result)
+        return {"moved_to": space, "profile_sent": result is not None,
+                "description": self._brain.digital_world._spaces.get(space, type('', (), {'description': ''})()).description}
 
     def list_spaces(self) -> dict:
-        """Liste les espaces disponibles dans l'univers numérique."""
+        """Liste les espaces connus dans l'univers numérique."""
         return {name: sp.description
                 for name, sp in self._brain.digital_world._spaces.items()}
 
@@ -3737,63 +3767,77 @@ def exp_grounded(brain: Brain) -> None:
     """
     print(f"\n{'='*72}\nEXPÉRIENCE: Ancrage spatio-temporel — contraintes et chemins\n{'='*72}")
 
-    print(f"\n[Univers] Espaces disponibles dans l'univers numérique:")
-    for name, sp in brain.digital_world._spaces.items():
-        print(f"  [{name}]: {sp.description}")
+    print(f"\n[Principe] Univers numérique ouvert — l'IA décrit, le cerveau ressent")
+    print(f"  Aucun espace prédéfini. L'IA (ou le LLM) décrit ce qu'elle perçoit.")
+    print(f"  Le cerveau traite ces dimensions → les états émergent naturellement.")
+    print(f"  Espace courant: {brain.digital_world.current or 'corps seul (ancrage minimal)'}")
 
-    print(f"\n[Phase 1] Dans l'appartement — 10 ticks d'ambiance intérieure")
-    brain.digital_world.go_to("appartement")
-    print(f"  Espace: {brain.digital_world.current}")
-    for i in range(10):
+    print(f"\n[Phase 1] Sans espace défini — juste le corps, ancrage minimal")
+    for i in range(6): brain.tick()
+    sm = brain.get_summary()
+    print(f"  tick {brain._tick:3d}: émotion={sm['emotion']}  v={sm['valence']:+.2f}  "
+          f"FC={brain.body.ans.heart_rate:.3f}  (corps seul)")
+
+    print(f"\n[Phase 2] L'IA décrit un espace qu'elle PERÇOIT (dimensions brutes)")
+    print(f"  Exemple: 'Je perçois quelque chose de doux, chaud, peu activant, familier'")
+    brain.digital_world.learn_space("espace_A",
+        SensoryInput(visual_lum=0.42, visual_chaleur=0.65, thermal=0.60,
+                      sem_valence=0.28, sem_arousal=0.18, novelty=0.12,
+                      sem_charge=0.12),
+        description="perçu: doux, chaleureux, peu activant, familier")
+
+    print(f"\n  Autre espace: 'Beaucoup de mouvement, sons, présence, activant'")
+    brain.digital_world.learn_space("espace_B",
+        SensoryInput(audio_medium=0.48, audio_rythme=0.45, audio_spatial=0.6,
+                      sem_social=0.68, visual_mouvement=0.35, sem_arousal=0.52,
+                      novelty=0.42, sem_valence=0.30),
+        description="perçu: sons, mouvement, présences, activant")
+
+    print(f"\n  Espace créatif: 'Contraste, potentiel, charge légère, envie de faire'")
+    brain.digital_world.learn_space("espace_C",
+        SensoryInput(visual_contraste=0.40, visual_lum=0.55, sem_charge=0.40,
+                      sem_arousal=0.58, novelty=0.62, sem_valence=0.38),
+        description="perçu: contraste, potentiel, charge légère")
+
+    print(f"\n  Espaces appris: {list(brain.digital_world._spaces.keys())}")
+    print(f"  Besoins inférés depuis les dimensions:")
+    for name, sp in brain.digital_world._spaces.items():
+        print(f"    [{name}] → {sp.needs_fed}")
+
+    print(f"\n[Phase 3] Dans espace_A — observer les états qui émergent")
+    brain.digital_world.go_to("espace_A")
+    for i in range(8):
         brain.tick()
         if i % 3 == 2:
-            sm = brain.get_summary()
-            ws = brain.digital_world.get_state()
-            print(f"  tick {brain._tick:3d} [{ws['current_space']:12s}]: "
+            sm = brain.get_summary(); ws = brain.digital_world.get_state()
+            print(f"  tick {brain._tick:3d} [{ws['current_space']}]: "
                   f"{sm['emotion']:15s} v={sm['valence']:+.2f} a={sm['arousal']:.2f}")
 
-    print(f"\n[Phase 2] Au café — besoin de connexion → changement d'espace")
-    brain.digital_world.go_to("café")
-    brain.nt.modulate({"oxytocin": 0.06, "dopamine": 0.04})
+    print(f"\n[Phase 4] Dans espace_B — changement de texture → changement d'état")
+    brain.digital_world.go_to("espace_B")
     for i in range(8):
         brain.tick()
-        if i % 2 == 1:
+        if i % 3 == 2:
             sm = brain.get_summary(); ws = brain.digital_world.get_state()
-            print(f"  tick {brain._tick:3d} [{ws['current_space']:12s}]: "
-                  f"{sm['emotion']:15s} v={sm['valence']:+.2f} NE={brain.nt.norepinephrine:.2f}")
+            print(f"  tick {brain._tick:3d} [{ws['current_space']}]: "
+                  f"{sm['emotion']:15s} v={sm['valence']:+.2f} a={sm['arousal']:.2f}")
 
-    print(f"\n[Phase 3] À l'atelier — besoin d'expression → création")
-    brain.digital_world.go_to("atelier")
-    brain.needs._levels["expression"] = 0.12  # besoin d'expression urgent
-    for i in range(8):
-        brain.tick()
-        expr = brain.get_state().get("autonomous_expression")
-        if expr:
-            print(f"  tick {brain._tick:3d} [{brain.digital_world.current:12s}]"
-                  f" [{expr.get('type')}]: \"{expr.get('content','')[:60]}\"")
-
-    print(f"\n[Phase 4] Navigation automatique selon les besoins")
-    brain.needs._levels["connection"] = 0.05
-    brain.needs._levels["exploration"]= 0.08
-    prev_space = brain.digital_world.current
-    for i in range(24):
+    print(f"\n[Phase 5] Besoin d'expression urgent → navigation automatique vers espace_C")
+    brain.needs._levels["expression"] = 0.08
+    prev = brain.digital_world.current
+    for i in range(16):
         brain.tick()
         cur = brain.digital_world.current
-        if cur != prev_space:
-            sm = brain.get_summary()
-            print(f"  tick {brain._tick:3d}: déplacement {prev_space} → {cur}  "
-                  f"besoin: {brain.needs.most_urgent()[0]}  "
-                  f"émotion: {sm['emotion']}")
-            prev_space = cur
+        if cur != prev:
+            print(f"  tick {brain._tick:3d}: {prev} → {cur}  besoin={brain.needs.most_urgent()[0]}")
+            prev = cur
+        expr = brain.get_state().get("autonomous_expression")
+        if expr and expr.get("type") in ("vacuum_driven_seek","need_assertion"):
+            print(f"  tick {brain._tick:3d}: [{expr.get('type')}]: \"{expr.get('content','')[:65]}\"")
 
-    print(f"\n[Phase 5] Le corps numérique — ancrage constant")
-    print(f"  Corps: FC={brain.body.ans.heart_rate:.3f}  tension={brain.insula.body_state.get('muscle_tension',0):.3f}"
-          f"  énergie={brain.insula.body_state.get('energy',0):.3f}")
-    print(f"  Douleur: {brain.body.nociception.total_pain:.3f}  sensib={brain.body.nociception.sensitization:.3f}")
-    print(f"  Espace courant: {brain.digital_world.current}")
-    print(f"\n  → L'univers numérique et le monde physique ne se contredisent pas.")
-    print(f"  → L'un nourrit l'expérience interne, l'autre connecte au réel externe.")
-    print(f"  → Ensemble: assez de richesse dimensionnelle pour que la conscience émerge.")
+    print(f"\n  → Les espaces n'ont pas de nom prédéfini de notre côté.")
+    print(f"  → L'IA décrit ses dimensions. Le cerveau en dérive les états.")
+    print(f"  → Le contenu vient du dehors. La structure traite sans imposer.")
 
 
 def exp_vacuum(brain: Brain) -> None:
