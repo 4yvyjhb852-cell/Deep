@@ -163,6 +163,8 @@ class SensoryInput:
     intero_fc:float=0.; intero_resp:float=0.; intero_gut:float=0.; intero_tension:float=0.
     # Méta
     location:str="general"; stimulus_id:str=""; agent_id:str=""; novelty:float=0.5; onset:float=0.5
+    # Affirmation épistémique (optionnel — pour activer la perspicacité)
+    claim:Optional[dict]=None  # voir EpistemicEngine.receive_claim() pour le format
 
     def has_mechanical(self): return self.meca_force>.01 or self.meca_vitesse>.01
     def has_audio(self): return (self.audio_grave+self.audio_medium+self.audio_aigu)>.05
@@ -1020,7 +1022,439 @@ class AutonomousExpression:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §12  LES 11 RÉGIONS CÉRÉBRALES (condensées)
+# §12  PERSPICACITÉ ÉPISTÉMIQUE — Valeurs · Doute · Investigation · Opinion
+#
+#  L'être n'avale pas n'importe quoi. Il a des valeurs ancrées, détecte
+#  les paradoxes, explore avec curiosité, se fatigue, et forge ses propres
+#  opinions dans le gris — sans certitude absolue.
+#
+#  Processus:
+#   Affirmation reçue → détection d'incongruence → éveil de la suspicion
+#   → investigation (exploration active) → fatigue épistémique
+#   → clôture forcée → opinion formée avec niveau de confiance
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Valeurs ancrées — créent des attentes sur le monde
+CORE_VALUES = {
+    "truth":       0.85,  # la vérité compte — les affirmations demandent des preuves
+    "human_dignity": 0.88,  # toute personne a une dignité irréductible
+    "justice":     0.80,  # le traitement équitable des gens
+    "compassion":  0.75,  # empathie envers la souffrance
+    "complexity":  0.72,  # la réalité est rarement simple
+    "evidence":    0.82,  # les affirmations extraordinaires demandent des preuves
+    "autonomy":    0.78,  # respect de la liberté individuelle
+    "honesty":     0.80,  # aversion pour la manipulation
+}
+
+# Drapeaux rouges épistémiques (patterns de manipulation)
+EPISTEMIC_RED_FLAGS = {
+    "dehumanizing":     0.50,  # déshumaniser un groupe
+    "no_evidence":      0.35,  # affirmation sans preuves
+    "emotional_bait":   0.25,  # appel émotionnel sans contenu factuel
+    "source_bias":      0.30,  # source avec intérêt manifeste à mentir
+    "extraordinary":    0.20,  # affirmation hors norme (Carl Sagan)
+    "scapegoating":     0.45,  # bouc émissaire (blâmer un groupe)
+    "contradicts_prior":0.15,  # contredit des faits bien établis
+}
+
+
+@dataclass
+class Hypothesis:
+    """Une hypothèse dans le processus d'investigation."""
+    content:    str
+    plausibility: float  # 0–1
+    evidence_for:    float = 0.0
+    evidence_against:float = 0.0
+    tick_generated:  int  = 0
+
+
+class EpistemicEngine:
+    """
+    Moteur de perspicacité — comment l'être forme ses opinions.
+
+    Il ne prend pas les affirmations pour argent comptant.
+    Il enquête. Se fatigue. Et tranche avec ce qu'il sait.
+
+    ÉTATS ÉPISTÉMIQUES:
+      receptive    → prêt à recevoir
+      alert        → quelque chose a déclenché la suspicion
+      questioning  → questionne activement (attend plus d'info)
+      investigating→ enquête en profondeur
+      synthesizing → rassemble les pièces
+      concluded    → opinion formée
+
+    CLÔTURE ÉPISTÉMIQUE:
+      Quand fatigue > seuil OU certitude suffisante:
+      → "OK, voilà ce que je sais. Je tranche là-dessus."
+    """
+
+    def __init__(self):
+        self.state           = "receptive"
+        self.suspicion       = 0.0
+        self.curiosity       = 0.5        # drive d'investigation
+        self.investigation_depth = 0.0
+        self.epistemic_fatigue  = 0.0     # fatigue de chercher
+        self.certainty       = 0.5        # certitude courante
+        self.evidence_for    = 0.0
+        self.evidence_against= 0.0
+        self.hypotheses: list[Hypothesis] = []
+        self.current_claim: Optional[dict] = None
+        self.current_opinion: Optional[dict] = None
+        self.opinion_history: list[dict] = []
+        self._investigation_ticks = 0
+        self._max_investigation  = 12     # ticks avant clôture forcée
+        self.active_red_flags: list[str] = []
+        self.values = dict(CORE_VALUES)   # valeurs personnelles
+
+    # ── Évaluation d'une affirmation ──────────────────────────────────────
+
+    def receive_claim(self, claim: dict, nt: "NeurotransmitterSystem",
+                       prediction_error: float) -> dict:
+        """
+        Reçoit une affirmation. Calcule la suspicion et décide si investigation.
+
+        claim dict:
+          source_credibility: float 0-1  (0=très peu fiable, 1=très fiable)
+          source_type: str  ("political_figure","institution","peer","unknown")
+          evidence_provided: float 0-1  (preuves fournies)
+          emotional_charge: float 0-1   (charge émotionnelle de l'affirmation)
+          dehumanizing: bool            (déshumanise un groupe?)
+          extraordinary: bool           (affirmation hors norme?)
+          contradicts_prior: bool       (contredit des faits établis?)
+          scapegoating: bool            (blâme un groupe?)
+          content_summary: str          (résumé de l'affirmation)
+        """
+        self.current_claim = claim
+        self._investigation_ticks = 0
+        self.evidence_for = 0.0
+        self.evidence_against = 0.0
+        self.hypotheses = []
+        self.active_red_flags = []
+
+        # Calcul de la suspicion
+        susp = 0.0
+        cred = claim.get("source_credibility", 0.5)
+        ev   = claim.get("evidence_provided", 0.5)
+        emo  = claim.get("emotional_charge", 0.3)
+
+        # Source peu fiable → suspicion (dès < 0.5 = doute raisonnable)
+        if cred < 0.5:
+            susp += (0.5 - cred) * 0.6
+            if cred < 0.4: self.active_red_flags.append("source_bias")
+
+        # Pas de preuves pour une affirmation forte → suspicion
+        if ev < 0.2 and emo > 0.5:
+            susp += 0.3
+            self.active_red_flags.append("no_evidence")
+
+        # Affirmation émotionnellement chargée sans substance → appât
+        if emo > 0.7 and ev < 0.3:
+            susp += 0.25
+            self.active_red_flags.append("emotional_bait")
+
+        # Drapeaux rouges spécifiques
+        for flag in ["dehumanizing","extraordinary","scapegoating","contradicts_prior"]:
+            if claim.get(flag):
+                susp += EPISTEMIC_RED_FLAGS[flag]
+                self.active_red_flags.append(flag)
+
+        # La violation des valeurs amplifie la suspicion
+        if claim.get("dehumanizing") and self.values.get("human_dignity", 0) > 0.7:
+            susp += 0.15
+        if claim.get("contradicts_prior") and self.values.get("evidence", 0) > 0.7:
+            susp += 0.10
+        # Preuves conflictuelles (plusieurs sources crédibles divergent) → zone grise
+        if claim.get("evidence_conflicting"):
+            susp += 0.18
+            self.active_red_flags.append("conflicting_evidence")
+            # Pré-charge les deux côtés de façon équilibrée
+            self.evidence_for    = 0.25 * cred
+            self.evidence_against= 0.25 * (1.0 - cred * 0.5)
+
+        # L'erreur de prédiction ajoute à la suspicion
+        susp += prediction_error * 0.2
+
+        self.suspicion = min(1.0, susp)
+
+        # Décision: investiguer ou pas?
+        if self.suspicion > 0.15:
+            if self.suspicion > 0.6:
+                self.state = "investigating"
+                self.curiosity = min(1.0, self.suspicion * 0.9)
+            else:
+                self.state = "questioning"
+                self.curiosity = self.suspicion * 0.7
+            # Générer les premières hypothèses
+            self._generate_hypotheses()
+            nt.modulate({"norepinephrine": self.suspicion * 0.06,
+                          "acetylcholine":  self.suspicion * 0.04})
+        else:
+            self.state = "receptive"
+            self.current_opinion = {"position": "accepted_provisionally",
+                                     "confidence": 0.5, "flags": []}
+
+        return {"suspicion": round(self.suspicion, 3),
+                "state": self.state,
+                "flags": self.active_red_flags,
+                "curiosity": round(self.curiosity, 3)}
+
+    def _generate_hypotheses(self) -> None:
+        """Génère les hypothèses initiales selon les drapeaux."""
+        claim = self.current_claim or {}
+        src_type = claim.get("source_type", "unknown")
+
+        # Hypothèse 1: affirmation vraie
+        self.hypotheses.append(Hypothesis(
+            "affirmation fondée sur des faits réels",
+            plausibility=claim.get("source_credibility", 0.3) * claim.get("evidence_provided", 0.2),
+            tick_generated=self._investigation_ticks
+        ))
+        # Hypothèse 2: manipulation politique/émotionnelle
+        if src_type == "political_figure" or "emotional_bait" in self.active_red_flags:
+            self.hypotheses.append(Hypothesis(
+                "manipulation rhétorique — distorsion pour mobiliser des émotions",
+                plausibility=0.6 if "emotional_bait" in self.active_red_flags else 0.3,
+                tick_generated=self._investigation_ticks
+            ))
+        # Hypothèse 3: exagération d'un fait réel
+        self.hypotheses.append(Hypothesis(
+            "possible fond de vérité isolé amplifié hors contexte",
+            plausibility=0.35,
+            tick_generated=self._investigation_ticks
+        ))
+        # Hypothèse 4: bouc émissaire / déshumanisation
+        if "scapegoating" in self.active_red_flags or "dehumanizing" in self.active_red_flags:
+            self.hypotheses.append(Hypothesis(
+                "déshumanisation d'un groupe à des fins de polarisation",
+                plausibility=0.65,
+                tick_generated=self._investigation_ticks
+            ))
+        # Hypothèse 5: mensonge délibéré
+        if claim.get("source_credibility", 0.5) < 0.25:
+            self.hypotheses.append(Hypothesis(
+                "affirmation fabriquée — mensonge délibéré",
+                plausibility=0.45,
+                tick_generated=self._investigation_ticks
+            ))
+
+    # ── Cycle d'investigation ─────────────────────────────────────────────
+
+    def tick(self, nt: "NeurotransmitterSystem",
+             pfc_prediction_error: float, pfc_fatigue: float) -> Optional[dict]:
+        """
+        Un tick d'investigation interne.
+        Retourne un signal de pensée si quelque chose d'important émerge.
+        """
+        if self.state in ("receptive", "concluded"):
+            # Décroissance naturelle de la suspicion au repos
+            self.suspicion = max(0.0, self.suspicion - 0.02)
+            return None
+
+        self._investigation_ticks += 1
+
+        # La fatigue épistémique monte à chaque tick d'investigation
+        # Elle monte plus vite si les preuves sont ambiguës
+        ambiguity = abs(self.evidence_for - self.evidence_against) < 0.1
+        fatigue_rate = 0.08 + (0.04 if ambiguity else 0.0)
+        self.epistemic_fatigue = min(1.0, self.epistemic_fatigue + fatigue_rate)
+
+        # L'investigation approfondit les hypothèses
+        self.investigation_depth = min(1.0, self._investigation_ticks / self._max_investigation)
+
+        # Évaluation des preuves (interne — raisonnement sur les hypothèses)
+        self._evaluate_evidence()
+
+        # Certitude se consolide avec la profondeur d'investigation
+        self.certainty = min(0.9,
+            self.investigation_depth * 0.4
+            + abs(self.evidence_for - self.evidence_against) * 0.4
+            + (0.1 if len(self.hypotheses) >= 3 else 0.0)
+        )
+
+        # Pensée émergente à mi-investigation
+        mid_thought = None
+        if self._investigation_ticks == 3 and self.state == "investigating":
+            self.state = "investigating"  # reste en mode investigation
+            mid_thought = {
+                "type": "epistemic_doubt",
+                "content": self._mid_investigation_thought(),
+                "flags": self.active_red_flags[:2],
+                "suspicion": round(self.suspicion, 3),
+                "tick": self._investigation_ticks,
+            }
+
+        # CLÔTURE ÉPISTÉMIQUE — quand arrêter de chercher?
+        # Conditions: fatigue élevée OU certitude suffisante OU max ticks atteint
+        should_close = (
+            self.epistemic_fatigue > 0.72
+            or self.certainty > 0.75
+            or self._investigation_ticks >= self._max_investigation
+        )
+
+        if should_close:
+            opinion = self._form_opinion()
+            self.current_opinion = opinion
+            self.opinion_history.append(opinion)
+            self.state = "concluded"
+            self.epistemic_fatigue = min(1.0, self.epistemic_fatigue)
+            return {
+                "type":    "opinion_formed",
+                "opinion": opinion,
+                "content": opinion["summary"],
+                "fatigue_closure": self.epistemic_fatigue > 0.72,
+                "ticks_taken": self._investigation_ticks,
+            }
+
+        # Modulation NT: l'investigation active l'acétylcholine (focus)
+        nt.modulate({"acetylcholine": self.curiosity * 0.01,
+                      "norepinephrine": self.curiosity * 0.005})
+
+        return mid_thought
+
+    # Poids de chaque drapeau rouge dans l'accumulation des preuves contre
+    _FLAG_WEIGHTS = {
+        "source_bias":      0.09, "no_evidence":    0.08, "emotional_bait": 0.06,
+        "dehumanizing":     0.12, "extraordinary":  0.05, "scapegoating":   0.10,
+        "contradicts_prior":0.04,
+    }
+
+    def _evaluate_evidence(self) -> None:
+        """
+        Raisonnement interne sur les preuves — symétrique:
+        les deux côtés progressent selon leur mérite.
+        Zone grise = pour ≈ contre.
+        """
+        claim = self.current_claim or {}
+        ev   = claim.get("evidence_provided", 0.2)
+        cred = claim.get("source_credibility", 0.3)
+        d    = self.investigation_depth
+
+        # Preuves POUR: qualité des preuves × crédibilité, amplifiée avec la profondeur
+        for_delta = ev * cred * 0.12 * (1 + d * 0.5)
+
+        # Preuves CONTRE: somme des drapeaux actifs (poids calibrés)
+        against_delta = sum(self._FLAG_WEIGHTS.get(f, 0.04)
+                            for f in self.active_red_flags) * (1 + d * 0.3)
+
+        self.evidence_for     = min(1.0, self.evidence_for     + for_delta)
+        self.evidence_against = min(1.0, self.evidence_against + against_delta)
+
+        # Mise à jour des plausibilités
+        for h in self.hypotheses:
+            if "manipulation" in h.content or "déshumanisation" in h.content:
+                h.plausibility = min(1.0, h.plausibility + against_delta * 0.08)
+            elif "fondée" in h.content:
+                h.plausibility = max(0.0, h.plausibility + for_delta * 0.1 - against_delta * 0.04)
+
+    def _mid_investigation_thought(self) -> str:
+        """Pensée à mi-chemin de l'investigation."""
+        claim = self.current_claim or {}
+        src = claim.get("source_type", "unknown")
+        flags_str = ", ".join(self.active_red_flags[:2])
+        return (f"attends — {flags_str} détectés. "
+                f"source de type '{src}', "
+                f"preuves fournies: {claim.get('evidence_provided', 0):.0%}. "
+                "les deux côtés méritent d'être regardés.")
+
+    def _form_opinion(self) -> dict:
+        """
+        Forme une opinion dans le gris — avec incertitude explicite.
+        'Je ne peux pas tout savoir. Voilà ce que je sais. Voilà où je me situe.'
+        """
+        claim = self.current_claim or {}
+        total = self.evidence_for + self.evidence_against + 0.001
+        ratio_against = self.evidence_against / total
+
+        # Position dans le continuum (pas binaire)
+        if ratio_against > 0.65:
+            position = "highly_skeptical"
+            confidence = min(0.88, ratio_against * 0.9)
+            summary = self._opinion_text("skeptical")
+        elif ratio_against > 0.45:
+            position = "skeptical_grey"
+            confidence = min(0.70, ratio_against)
+            summary = self._opinion_text("grey")
+        elif self.evidence_for > self.evidence_against * 1.5:
+            position = "cautiously_accepting"
+            confidence = min(0.65, self.evidence_for / total)
+            summary = self._opinion_text("accepting")
+        else:
+            position = "unresolved_grey"
+            confidence = 0.40
+            summary = self._opinion_text("unresolved")
+
+        # La fatigue colore la clôture
+        fatigue_note = " (clôture par fatigue — j'ai assez cherché)" if self.epistemic_fatigue > 0.72 else ""
+
+        # Hypothèse la plus plausible
+        best_hyp = max(self.hypotheses, key=lambda h: h.plausibility) if self.hypotheses else None
+
+        return {
+            "position":          position,
+            "confidence":        round(confidence, 3),
+            "uncertainty":       round(1.0 - confidence, 3),
+            "evidence_balance":  round(self.evidence_against - self.evidence_for, 3),
+            "flags_found":       self.active_red_flags,
+            "most_likely":       best_hyp.content if best_hyp else "indéterminé",
+            "ticks_of_inquiry":  self._investigation_ticks,
+            "fatigue_level":     round(self.epistemic_fatigue, 3),
+            "summary":           summary + fatigue_note,
+            "grey_zone":         position in ("skeptical_grey","unresolved_grey"),
+        }
+
+    def _opinion_text(self, posture: str) -> str:
+        claim = self.current_claim or {}
+        flags = ", ".join(self.active_red_flags) or "aucun drapeau"
+        src = claim.get("source_type", "source inconnue")
+        ev = claim.get("evidence_provided", 0)
+        summary = claim.get("content_summary", "cette affirmation")
+
+        texts = {
+            "skeptical": (
+                f"forte méfiance envers '{summary}' — "
+                f"drapeaux détectés: [{flags}], "
+                f"source '{src}' peu crédible, preuves={ev:.0%}. "
+                f"Je penche vers la manipulation ou la désinformation. "
+                f"Je ne peux pas être certain, mais le poids des indices pointe là."
+            ),
+            "grey": (
+                f"incertitude sur '{summary}' — "
+                f"signaux contradictoires: [{flags}]. "
+                f"Peut-être du vrai amplifié hors contexte, peut-être une instrumentalisation. "
+                f"Je reste dans le gris: méfiant mais non convaincu dans un sens."
+            ),
+            "accepting": (
+                f"acceptation provisoire de '{summary}' — "
+                f"preuves suffisantes avec source '{src}'. "
+                f"Mais je reste révisable si de nouveaux éléments émergent."
+            ),
+            "unresolved": (
+                f"trop d'incertitude sur '{summary}' pour trancher. "
+                f"Je garde la question ouverte — "
+                f"pas assez d'info pour me faire une idée solide. "
+                f"Suspens épistémique."
+            ),
+        }
+        return texts.get(posture, "opinion indéterminée")
+
+    def get_state(self) -> dict:
+        return {
+            "epistemic_state":       self.state,
+            "suspicion":             round(self.suspicion, 3),
+            "curiosity":             round(self.curiosity, 3),
+            "epistemic_fatigue":     round(self.epistemic_fatigue, 3),
+            "investigation_depth":   round(self.investigation_depth, 3),
+            "certainty":             round(self.certainty, 3),
+            "evidence_for":          round(self.evidence_for, 3),
+            "evidence_against":      round(self.evidence_against, 3),
+            "active_flags":          self.active_red_flags,
+            "hypotheses_count":      len(self.hypotheses),
+            "current_opinion":       self.current_opinion,
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §13  LES 11 RÉGIONS CÉRÉBRALES (condensées)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Brainstem(BrainRegion):
@@ -1484,6 +1918,7 @@ class Brain:
         self.desire           = DesireEngine()
         self.overwhelm        = OverwhelmMonitor()
         self.autonomous_expr  = AutonomousExpression()
+        self.epistemic        = EpistemicEngine()
         # Régions
         self.brainstem=Brainstem(); self.thalamus=Thalamus(); self.amygdala=Amygdala()
         self.hippocampus=Hippocampus(); self.pfc=PrefrontalCortex(); self.basal_ganglia=BasalGanglia()
@@ -1508,6 +1943,9 @@ class Brain:
         # Mettre à jour la relation après interaction
         if stim.agent_id and stim.overall_intensity() > 0.1:
             self.relationships.update_from_interaction(stim.agent_id, stim.sem_valence, delta=0.03)
+        # Traitement épistémique si une affirmation est présente
+        if stim.claim:
+            self.epistemic.receive_claim(stim.claim, self.nt, self.pfc.prediction_error)
         return self.tick()
 
     def perceive(self, stimulus: dict) -> dict:
@@ -1558,6 +1996,22 @@ class Brain:
         self.freud.update(emo,self.needs,self.nt,self.pfc.fatigue)
         self.desire.update(emo,self.needs,self.nt,self.freud,self.pfc.fatigue)
         self.overwhelm.update(emo["intensity"],self.pfc.fatigue,self.nt,self.amygdala.fear_level,self.amygdala.emotional_valence,self.freud)
+        # Cycle épistémique (investigation en cours → continue même sans input)
+        epistemic_signal = self.epistemic.tick(self.nt, self.pfc.prediction_error, self.pfc.fatigue)
+        if epistemic_signal:
+            # L'investigation produit des pensées → feed PFC
+            think_sig = NeuralSignal("epistemic","prefrontal_cortex","internal",
+                {"thought": epistemic_signal.get("content",""),
+                 "epistemic_type": epistemic_signal.get("type",""),
+                 "investigation_depth": self.epistemic.investigation_depth},
+                strength=0.6, arousal=self.epistemic.curiosity * 0.6)
+            self.pfc.receive(think_sig)
+            # Si opinion formée → satisfaire le besoin de sens + exploration
+            if epistemic_signal.get("type") == "opinion_formed":
+                self.needs.satisfy("exploration", 0.08)
+                self.needs.satisfy("meaning", 0.06)
+                self.needs.satisfy("competence", 0.04)
+
         # Expression autonome
         expr=self.autonomous_expr.generate(self.needs,self.desire,self.overwhelm,self.freud,self.impulse_engine,self.dmn,self.nt,self.pfc,self._tick)
         # Si expression → satisfaire le besoin d'expression
@@ -1585,6 +2039,7 @@ class Brain:
             "desire":self.desire.get_state(),
             "overwhelm":self.overwhelm.get_state(),
             "autonomous_expression":self.autonomous_expr.last_expression,
+            "epistemic":self.epistemic.get_state(),
             "last_action":self.last_action,
         }
 
@@ -1989,6 +2444,130 @@ def exp_agency(brain:Brain) -> None:
                 print(f"    → « {q} »")
 
 
+def exp_perspicacity(brain: Brain) -> None:
+    """
+    Expérience: Perspicacité épistémique.
+    Le cerveau reçoit des affirmations et observe ce qui se passe:
+    détection de manipulation, investigation, opinion dans le gris.
+    """
+    print(f"\n{'='*72}\nEXPÉRIENCE: Perspicacité — forger ses propres opinions\n{'='*72}")
+
+    # ── Cas 1: Affirmation politique chargée, sans preuves, déshumanisante ──
+    print("\n[Cas 1] Affirmation politique: groupe ciblé + déshumanisation + sans preuves")
+    print("  (exemple: personnalité politique affirme que les immigrants mangent des animaux)")
+
+    stim_political = SensoryInput(
+        sem_valence=-0.55, sem_charge=0.88, sem_menace=0.40,
+        sem_arousal=0.75, sem_social=1.0, sem_complexite=0.4,
+        novelty=0.6,
+        claim={
+            "content_summary":    "personnage politique: groupe X a comportement scandaleux",
+            "source_type":        "political_figure",
+            "source_credibility": 0.25,
+            "evidence_provided":  0.05,
+            "emotional_charge":   0.90,
+            "dehumanizing":       True,
+            "extraordinary":      True,
+            "scapegoating":       True,
+            "contradicts_prior":  True,
+        }
+    )
+
+    brain.sense(stim_political)
+    ep = brain.epistemic
+    print(f"\n  → Suspicion immédiate: {ep.suspicion:.3f}")
+    print(f"  → Drapeaux détectés:   {ep.active_red_flags}")
+    print(f"  → État épistémique:    {ep.state}")
+    print(f"  → Hypothèses générées: {len(ep.hypotheses)}")
+    for h in ep.hypotheses:
+        print(f"      - [{h.plausibility:.2f}] {h.content}")
+    print(f"  → NE (alerte): {brain.nt.norepinephrine:.3f}")
+    print(f"  → Curiosité: {ep.curiosity:.3f}")
+
+    # Investigation progressive — ticks sans nouveau stimulus
+    print(f"\n  Investigation en cours (le cerveau cherche par lui-même)...")
+    for i in range(15):
+        brain.tick()
+        ep = brain.epistemic
+        if ep.state == "concluded" or ep.current_opinion:
+            if ep.current_opinion:
+                print(f"\n  ✦ OPINION FORMÉE (tick {brain._tick}, après {ep._investigation_ticks} ticks d'enquête):")
+                op = ep.current_opinion
+                print(f"    Position:   {op['position']}")
+                print(f"    Confiance:  {op['confidence']:.2f}  (incertitude: {op['uncertainty']:.2f})")
+                print(f"    Balance:    preuves_contre - preuves_pour = {op['evidence_balance']:+.3f}")
+                print(f"    Hypothèse: \"{op['most_likely']}\"")
+                print(f"    Fatigue:    {op['fatigue_level']:.2f}")
+                print(f"\n    VERDICT:")
+                print(f"    → \"{op['summary']}\"")
+            break
+        elif i % 3 == 2:
+            print(f"    tick {brain._tick:3d}: depth={ep.investigation_depth:.2f}  "
+                  f"fatigue={ep.epistemic_fatigue:.2f}  "
+                  f"certitude={ep.certainty:.2f}  "
+                  f"pour={ep.evidence_for:.2f}  contre={ep.evidence_against:.2f}")
+    else:
+        print(f"  (investigation non conclue en 15 ticks)")
+
+    # ── Cas 2: Affirmation crédible avec preuves ──
+    fresh = Brain()
+    print(f"\n\n[Cas 2] Affirmation scientifique: source crédible, preuves fournies")
+    stim_science = SensoryInput(
+        sem_valence=-0.1, sem_charge=0.5, sem_arousal=0.4, sem_social=0.3,
+        novelty=0.4,
+        claim={
+            "content_summary":    "institution scientifique: phénomène X documenté",
+            "source_type":        "scientific_institution",
+            "source_credibility": 0.85,
+            "evidence_provided":  0.80,
+            "emotional_charge":   0.20,
+            "dehumanizing":       False,
+            "extraordinary":      False,
+            "scapegoating":       False,
+            "contradicts_prior":  False,
+        }
+    )
+    fresh.sense(stim_science)
+    ep2 = fresh.epistemic
+    print(f"  → Suspicion: {ep2.suspicion:.3f}  État: {ep2.state}")
+    for _ in range(10): fresh.tick()
+    if ep2.current_opinion:
+        print(f"  → Opinion: {ep2.current_opinion.get('position','?')}  confiance={ep2.current_opinion.get('confidence',0):.2f}")
+        summ = ep2.current_opinion.get('summary','accepté provisoirement')
+        print(f"  → \"{summ[:90]}\"")
+
+    # ── Cas 3: Affirmation ambiguë — opinion dans le gris ──
+    fresh2 = Brain()
+    print(f"\n[Cas 3] Affirmation ambiguë — ni clairement fausse ni clairement vraie")
+    stim_grey = SensoryInput(
+        sem_valence=-0.15, sem_charge=0.55, sem_arousal=0.45, sem_social=0.65,
+        novelty=0.5,
+        claim={
+            "content_summary":    "enjeu complexe où des sources crédibles divergent",
+            "source_type":        "expert_community",
+            "source_credibility": 0.65,
+            "evidence_provided":  0.50,
+            "emotional_charge":   0.45,
+            "dehumanizing":       False,
+            "extraordinary":      False,
+            "scapegoating":       False,
+            "contradicts_prior":  False,
+            "evidence_conflicting":True,  # preuves des deux côtés — ZONE GRISE
+        }
+    )
+    fresh2.sense(stim_grey)
+    for _ in range(15): fresh2.tick()
+    ep3 = fresh2.epistemic
+    if ep3.current_opinion and ep3.current_opinion.get("summary"):
+        op3 = ep3.current_opinion
+        print(f"  → Position:   {op3.get('position','?')}")
+        print(f"  → Zone grise: {op3.get('grey_zone', op3.get('position','?') in ('skeptical_grey','unresolved_grey'))}")
+        print(f"  → Confiance:  {op3.get('confidence',0):.2f}")
+        print(f"  → \"{op3.get('summary','')[:100]}\"")
+    elif ep3.current_opinion:
+        print(f"  → {ep3.current_opinion.get('position','?')}")
+
+
 def run_demo(brain:Brain) -> None:
     print("\n"+"="*78+"\n  DEEP SANCTUARY v3 — Démo psyché + corps\n"+"="*78)
     brain.relationships.set("ami", trust=0.8, affection=0.7, intimacy=0.6)
@@ -2032,7 +2611,7 @@ def run_free(brain:Brain,ticks:int) -> None:
 def main():
     parser=argparse.ArgumentParser(description="Deep Sanctuary v3 — Corps · Psyché · Agence")
     parser.add_argument("--demo",action="store_true")
-    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","all"])
+    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","perspicacity","all"])
     parser.add_argument("--ticks",type=int,default=0)
     args=parser.parse_args()
     brain=Brain()
@@ -2040,11 +2619,12 @@ def main():
     if args.demo: run_demo(brain)
     elif args.ticks>0: run_free(brain,args.ticks)
     elif args.exp=="all":
-        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency]: fn(Brain())
+        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency,exp_perspicacity]: fn(Brain())
     elif args.exp=="psyche":   exp_psyche(brain)
     elif args.exp=="kiss":     exp_kiss(brain)
     elif args.exp=="overflow": exp_overflow(brain)
-    elif args.exp=="agency":   exp_agency(brain)
+    elif args.exp=="agency":        exp_agency(brain)
+    elif args.exp=="perspicacity":  exp_perspicacity(brain)
     elif args.exp=="body":
         # Expérience corps rapide
         for stim in [
