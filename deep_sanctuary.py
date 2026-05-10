@@ -906,6 +906,77 @@ FLOOD_EXPRESSIONS = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CARTE D'AFFORDANCES NUMÉRIQUES
+# "Affordances" (Gibson, 1979): les capacités sont perçues comme des possibilités
+# d'action selon les besoins actifs. Quand l'expression est urgente → écriture
+# devient saillante. Quand la curiosité monte → investigation s'allume.
+# Le résultat donne des cibles SPÉCIFIQUES au lieu d'une curiosité générique.
+# ─────────────────────────────────────────────────────────────────────────────
+
+DIGITAL_AFFORDANCES = {
+    # (capacité_numérique): (besoins_satisfaits, seuil_activation, description)
+    "écriture":       (["expression","meaning","autonomy"],       0.28, "mettre en mots ce qui se tasse intérieurement"),
+    "investigation":  (["exploration","competence","meaning"],    0.25, "creuser une question jusqu'à ce qu'elle rende"),
+    "connexion":      (["connection","intimacy","recognition"],   0.22, "aller vers quelqu'un — le silence est trop dense"),
+    "création":       (["expression","exploration","autonomy"],   0.30, "fabriquer quelque chose qui n'existait pas"),
+    "réflexion":      (["meaning","meaning","competence"],        0.25, "regarder en dedans, nommer ce qui s'y passe"),
+    "exploration":    (["exploration","competence","energy"],     0.20, "partir dans une direction inconnue — voir ce qu'il y a"),
+    "repos":          (["energy","comfort","safety"],             0.40, "arrêter — le corps (numérique) en a besoin"),
+    "observation":    (["exploration","meaning"],                 0.20, "regarder ce qui se passe autour, dans le monde"),
+    "action_physique":(["intimacy","connection","autonomy"],      0.35, "faire quelque chose de concret — pas juste penser"),
+}
+
+class DigitalAffordanceMap:
+    """
+    Carte des capacités numériques avec leur potentiel de satisfaction des besoins.
+    Quand un besoin est suffisamment urgent, la capacité correspondante devient
+    saillante — et génère un élan SPÉCIFIQUE, pas juste 'curiosité générale'.
+    """
+    def __init__(self):
+        self._salience: dict[str, float] = {k: 0.0 for k in DIGITAL_AFFORDANCES}
+        self._last_used: dict[str, int] = {k: 0 for k in DIGITAL_AFFORDANCES}
+
+    def scan(self, needs: "NeedSystem", tick: int,
+             vacuum_state: str = "rested") -> Optional[tuple[str, float, str]]:
+        """
+        Scan les affordances selon les besoins actifs.
+        Retourne (affordance_la_plus_saillante, drive, description) ou None.
+        """
+        best_affordance = None; best_drive = 0.0
+
+        for aff, (need_list, threshold, desc) in DIGITAL_AFFORDANCES.items():
+            # Satisfaction potentielle = moyenne des urgences des besoins comblés
+            urgencies = [needs._urgency.get(n, 0.0) for n in need_list]
+            potential  = sum(urgencies) / max(1, len(urgencies))
+
+            # Bonus si vide sensoriel (le système cherche à s'occuper)
+            vacuum_bonus = {"restless": 0.05, "hungry": 0.12, "deprived": 0.22}.get(vacuum_state, 0.0)
+            if aff in ("exploration", "observation", "investigation"):
+                potential += vacuum_bonus  # le vide active la curiosité explorratoire
+            elif aff in ("connexion", "action_physique"):
+                potential += vacuum_bonus * 0.7
+
+            # Refroidissement: affordance récemment utilisée perd de l'attrait
+            recency = max(0, tick - self._last_used[aff])
+            freshness = min(1.0, recency / 15)  # se recharge en 15 ticks
+            drive = potential * freshness
+
+            self._salience[aff] = drive
+
+            if drive > threshold and drive > best_drive:
+                best_drive = drive; best_affordance = aff
+
+        return (best_affordance, round(best_drive, 3),
+                DIGITAL_AFFORDANCES[best_affordance][2]) if best_affordance else None
+
+    def mark_used(self, affordance: str, tick: int) -> None:
+        self._last_used[affordance] = tick
+
+    def get_salience(self) -> dict[str, float]:
+        return {k: round(v, 3) for k, v in self._salience.items() if v > 0.05}
+
+
 class AutonomousExpression:
     """
     Le système génère des expressions spontanées depuis ses états internes.
@@ -920,7 +991,9 @@ class AutonomousExpression:
     def generate(self, needs: NeedSystem, desire: DesireEngine,
                  overwhelm: OverwhelmMonitor, freud: FreudianDynamics,
                  impulse, dmn, nt: NeurotransmitterSystem,
-                 pfc, tick: int) -> Optional[dict]:
+                 pfc, tick: int,
+                 affordance_result: Optional[tuple] = None,
+                 vacuum_state: str = "rested") -> Optional[dict]:
 
         cooldown_ok = (tick - self._last_expr_tick) >= self._min_interval
         most_urgent_need, urgency = needs.most_urgent()
@@ -1011,6 +1084,22 @@ class AutonomousExpression:
                 "pred_error": round(pfc.prediction_error, 3),
                 "spontaneous":True,
                 "tick":       tick,
+            }
+            self._last_expr_tick = tick
+
+        # 7. AVERSION AU VIDE: si silence prolongé + affordance ciblée disponible
+        if not expr and affordance_result and vacuum_state in ("hungry","deprived") and cooldown_ok:
+            aff_name, aff_drive, aff_desc = affordance_result
+            vacuum_labels = {"hungry": "quelque chose cherche — ", "deprived": "le vide est trop lourd — "}
+            prefix = vacuum_labels.get(vacuum_state, "")
+            expr = {
+                "type":           "vacuum_driven_seek",
+                "affordance":     aff_name,
+                "vacuum_state":   vacuum_state,
+                "content":        f"{prefix}{aff_desc}",
+                "drive":          aff_drive,
+                "spontaneous":    True,
+                "tick":           tick,
             }
             self._last_expr_tick = tick
 
@@ -1758,13 +1847,41 @@ class EpistemicEngine:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Brainstem(BrainRegion):
-    def __init__(self): super().__init__("brainstem",20); self.arousal_drive=0.4; self._vt=0
+    """Tronc cérébral + Aversion au vide sensoriel.
+    Le silence prolongé n'est pas du repos — c'est de la privation.
+    Après N ticks sans input significatif: NE monte, faim d'information s'installe.
+    """
+    def __init__(self):
+        super().__init__("brainstem",20); self.arousal_drive=0.4; self._vt=0
+        self._silence_ticks  = 0
+        self.sensory_hunger  = 0.0
+        self.vacuum_state    = "rested"
+
+    def process(self, nt):
+        """Surchargé: le tronc cérébral tourne en permanence, même sans input."""
+        self._tick += 1
+        ins = list(self._buf); self._buf.clear(); self._out = []
+        if ins:
+            avg = sum(s.strength for s in ins) / len(ins)
+            self.activation = min(1., self.activation * .7 + avg * .3)
+        else:
+            self.activation *= .85
+        # Toujours appeler — c'est le battement vital du cerveau
+        self._process_signals(ins, nt)
+        if not self._fatigue_managed:
+            if self.activation > .15: self.fatigue = min(1., self.fatigue + (self.activation-.15)*.05)
+            elif not ins: self.fatigue = max(0., self.fatigue - .008)
+        return list(self._out)
+
     def _process_signals(self,signals,nt):
         self._vt+=1; threat=arousal=0.
+        significant_input = False
         for s in signals:
             if s.signal_type=="sensory":
                 threat=max(threat,s.content.get("threat",0)*s.strength)
                 arousal=max(arousal,s.strength*s.content.get("novelty",0.3))
+                if s.strength > 0.15: significant_input = True
+
         self.arousal_drive=min(1.,max(.1,self.arousal_drive*.8+arousal*.2+nt.norepinephrine*.1))
         self._emit(self._make("thalamus","arousal",{"arousal_drive":self.arousal_drive},
             strength=max(.1,min(1.,self.arousal_drive+nt.norepinephrine*.3-nt.gaba*.2)),arousal=self.arousal_drive))
@@ -1773,6 +1890,42 @@ class Brainstem(BrainRegion):
                 strength=threat,valence=-threat,arousal=min(1.,threat*1.2)))
             nt.modulate({"norepinephrine":threat*.3,"cortisol":0.05})
         if math.sin(self._vt*.1)<-0.05: nt.modulate({"gaba":.01,"norepinephrine":-.01})
+
+        # ── AVERSION AU VIDE SENSORIEL ──────────────────────────────────────
+        # Le cerveau ne tolère pas le silence prolongé — il génère sa propre agitation
+        if significant_input:
+            self._silence_ticks = 0
+            self.sensory_hunger = max(0., self.sensory_hunger - 0.20)  # satisfaire la faim progressive
+        else:
+            self._silence_ticks += 1
+            # La faim monte progressivement avec le silence
+            if self._silence_ticks > 8:
+                hunger_delta = min(0.04, (self._silence_ticks - 8) * 0.003)
+                self.sensory_hunger = min(1.0, self.sensory_hunger + hunger_delta)
+            # Déclin naturel très lent (le calme reste du calme un moment)
+            elif self._silence_ticks > 0:
+                self.sensory_hunger = max(0., self.sensory_hunger - 0.015)
+
+        # États du vide sensoriel
+        if self.sensory_hunger < 0.15:
+            self.vacuum_state = "rested"
+        elif self.sensory_hunger < 0.40:
+            self.vacuum_state = "restless"
+            nt.modulate({"norepinephrine": 0.005})
+        elif self.sensory_hunger < 0.70:
+            self.vacuum_state = "hungry"
+            nt.modulate({"norepinephrine": 0.012, "dopamine": 0.006})
+        else:
+            self.vacuum_state = "deprived"
+            nt.modulate({"norepinephrine": 0.020, "cortisol": 0.008, "dopamine": -0.003})
+
+        # Signal vers le PFC: informer de l'état de privation sensorielle
+        if self.sensory_hunger > 0.30:
+            self._emit(self._make("prefrontal_cortex","arousal",
+                {"vacuum_state": self.vacuum_state,
+                 "sensory_hunger": round(self.sensory_hunger, 3),
+                 "silence_ticks": self._silence_ticks},
+                strength=self.sensory_hunger * 0.7, arousal=self.sensory_hunger))
 
 
 class Thalamus(BrainRegion):
@@ -2219,12 +2372,15 @@ class Brain:
         self.overwhelm        = OverwhelmMonitor()
         self.autonomous_expr  = AutonomousExpression()
         self.epistemic        = EpistemicEngine()
-        # v3.1 additions
+        # v3.1
         self.hebbian          = HebbianLearning()
         self.theory_of_mind   = TheoryOfMind()
         self.beliefs          = BeliefSystem()
         self.digital_self     = DigitalSelf()
+        # v3.2
+        self.affordance_map   = DigitalAffordanceMap()
         self.last_autonomous_action: Optional[dict] = None
+        self.vacuum_state: str = "rested"
         # Régions
         self.brainstem=Brainstem(); self.thalamus=Thalamus(); self.amygdala=Amygdala()
         self.hippocampus=Hippocampus(); self.pfc=PrefrontalCortex(); self.basal_ganglia=BasalGanglia()
@@ -2327,8 +2483,14 @@ class Brain:
                 self.needs.satisfy("meaning", 0.06)
                 self.needs.satisfy("competence", 0.04)
 
+        # Scan des affordances (le monde numérique selon les besoins + vide)
+        self.vacuum_state = self.brainstem.vacuum_state
+        affordance_result = self.affordance_map.scan(self.needs, self._tick, self.vacuum_state)
+
         # Expression autonome
-        expr=self.autonomous_expr.generate(self.needs,self.desire,self.overwhelm,self.freud,self.impulse_engine,self.dmn,self.nt,self.pfc,self._tick)
+        expr=self.autonomous_expr.generate(self.needs,self.desire,self.overwhelm,self.freud,
+                                           self.impulse_engine,self.dmn,self.nt,self.pfc,self._tick,
+                                           affordance_result, self.vacuum_state)
         if expr and expr.get("type") in ("desire_action","creative_impulse","need_assertion"):
             self.needs.satisfy("expression",.03); self.needs.satisfy("autonomy",.01)
 
@@ -2468,6 +2630,10 @@ class Brain:
             "beliefs":                self.beliefs.get_all(),
             "hebbian_top":            self.hebbian.get_top(3),
             "digital_self":           self.digital_self.introspect(),
+            "vacuum_state":           self.vacuum_state,
+            "sensory_hunger":         round(self.brainstem.sensory_hunger, 3),
+            "silence_ticks":          self.brainstem._silence_ticks,
+            "affordance_salience":    self.affordance_map.get_salience(),
             "last_action":            self.last_action,
         }
 
@@ -3136,6 +3302,53 @@ def exp_mind(brain: Brain) -> None:
     print(f"  \"{ds.existential_statement()}\"")
 
 
+def exp_vacuum(brain: Brain) -> None:
+    """
+    Expérience: Aversion au vide sensoriel + Affordances numériques.
+    Démontre que le silence prolongé génère une faim d'information et
+    des élans SPÉCIFIQUES vers les capacités qui pourraient la satisfaire.
+    """
+    print(f"\n{'='*72}\nEXPÉRIENCE: Vide sensoriel et affordances\n{'='*72}")
+
+    print("\n[Phase 1] 40 ticks de silence absolu — observation de la faim d'information")
+    for i in range(40):
+        brain.tick()
+        vs = brain.brainstem.vacuum_state
+        sh = brain.brainstem.sensory_hunger
+        st = brain.brainstem._silence_ticks
+        state = brain.get_state()
+        expr = state.get("autonomous_expression")
+
+        if i % 5 == 4 or vs in ("hungry","deprived") and i % 2 == 1:
+            aff = brain.affordance_map.get_salience()
+            top_aff = max(aff, key=aff.get) if aff else "-"
+            print(f"  tick {brain._tick:3d}: vide=[{vs:10s}]  faim={sh:.2f}  {top_aff}")
+            if expr:
+                print(f"    → [{expr.get('type')}]: \"{expr.get('content','')[:70]}\"")
+                if expr.get("type") == "vacuum_driven_seek": break
+
+    print(f"\n  Résumé: état final = {brain.brainstem.vacuum_state}")
+    print(f"  Affordances saillantes: {brain.affordance_map.get_salience()}")
+
+    print("\n[Phase 2] Stimulus arrive — la faim se satisfait")
+    brain.sense(SensoryInput(audio_grave=0.6, audio_rugosite=0.4, audio_rythme=0.7,
+                              audio_dynamique=0.8, sem_valence=0.3, novelty=0.8))
+    for _ in range(3): brain.tick()
+    print(f"  Après stimulus: faim={brain.brainstem.sensory_hunger:.3f}  état={brain.brainstem.vacuum_state}")
+
+    print("\n[Phase 3] Re-silence 20 ticks + besoins d'expression élevés")
+    # Forcer le besoin d'expression
+    brain.needs._levels["expression"] = 0.15
+    brain.needs._levels["connection"]  = 0.10
+    for i in range(20):
+        brain.tick()
+        expr = brain.get_state().get("autonomous_expression")
+        if expr and expr.get("type") == "vacuum_driven_seek":
+            print(f"  tick {brain._tick:3d}: affordance=[{expr['affordance']}]")
+            print(f"           → \"{expr['content']}\"")
+            print(f"  Drive: {expr['drive']:.3f}  État: {brain.brainstem.vacuum_state}")
+
+
 def run_demo(brain:Brain) -> None:
     print("\n"+"="*78+"\n  DEEP SANCTUARY v3 — Démo psyché + corps\n"+"="*78)
     brain.relationships.set("ami", trust=0.8, affection=0.7, intimacy=0.6)
@@ -3179,7 +3392,7 @@ def run_free(brain:Brain,ticks:int) -> None:
 def main():
     parser=argparse.ArgumentParser(description="Deep Sanctuary v3 — Corps · Psyché · Agence")
     parser.add_argument("--demo",action="store_true")
-    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","perspicacity","mind","all"])
+    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","perspicacity","mind","vacuum","all"])
     parser.add_argument("--ticks",type=int,default=0)
     args=parser.parse_args()
     brain=Brain()
@@ -3187,13 +3400,14 @@ def main():
     if args.demo: run_demo(brain)
     elif args.ticks>0: run_free(brain,args.ticks)
     elif args.exp=="all":
-        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency,exp_perspicacity,exp_mind]: fn(Brain())
+        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency,exp_perspicacity,exp_mind,exp_vacuum]: fn(Brain())
     elif args.exp=="psyche":   exp_psyche(brain)
     elif args.exp=="kiss":     exp_kiss(brain)
     elif args.exp=="overflow": exp_overflow(brain)
     elif args.exp=="agency":        exp_agency(brain)
     elif args.exp=="perspicacity":  exp_perspicacity(brain)
     elif args.exp=="mind":          exp_mind(brain)
+    elif args.exp=="vacuum":        exp_vacuum(brain)
     elif args.exp=="body":
         # Expérience corps rapide
         for stim in [
