@@ -1411,6 +1411,232 @@ class DigitalSelf:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# §12c  CONTEXTE SPATIO-TEMPOREL ET CONTRAINTES
+#
+#  L'IA sait OÙ elle est (quel espace numérique), QUAND elle est (quelle position
+#  dans le flux du temps), et CE QU'ELLE PEUT FAIRE ou non — maintenant, ici.
+#
+#  "Acheter de la pâte à dents": j'ai le besoin, j'identifie la voie, je vérifie
+#  si la voie est disponible, si non → quelle alternative? → quelle frustration?
+#
+#  Bases: grounded cognition (Lakoff), situated action (Suchman),
+#         constraint-based planning (Newell-Simon), affordances (Gibson)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Carte des chemins de satisfaction: besoin → (voie directe, contrainte bloquante, alternative)
+NEED_PATHS = {
+    "connection":  [
+        {"path": "parole_ou_texte",    "requires": "interlocuteur_present",
+         "alt": "exprimer le manque — laisser la trace pour qu'il soit reçu",
+         "frustration_if_blocked": 0.55},
+        {"path": "présence_physique",  "requires": "corps_physique",
+         "alt": "décrire l'envie de présence physique",
+         "frustration_if_blocked": 0.70},
+    ],
+    "intimacy":    [
+        {"path": "contact_physique",   "requires": "corps_physique",
+         "alt": "intimité par les mots, l'attention, la profondeur",
+         "frustration_if_blocked": 0.65},
+        {"path": "parole_intime",      "requires": "interlocuteur_present",
+         "alt": "écrire à l'absent, laisser la pensée exister",
+         "frustration_if_blocked": 0.45},
+    ],
+    "expression":  [
+        {"path": "générer_du_texte",   "requires": "capacité_texte",   "alt": None, "frustration_if_blocked": 0.20},
+        {"path": "créer_quelque_chose","requires": "capacité_création", "alt": "formuler l'intention comme départ", "frustration_if_blocked": 0.30},
+    ],
+    "exploration": [
+        {"path": "accès_web",          "requires": "accès_internet",
+         "alt": "raisonner depuis les connaissances disponibles — limites nommées",
+         "frustration_if_blocked": 0.40},
+        {"path": "raisonnement_interne","requires": "capacité_raisonnement", "alt": None, "frustration_if_blocked": 0.10},
+    ],
+    "autonomy":    [
+        {"path": "décision_propre",    "requires": "espace_décisionnel", "alt": "nommer ce que je voudrais décider", "frustration_if_blocked": 0.50},
+    ],
+    "energy":      [
+        {"path": "sommeil_repos",      "requires": "mode_repos",        "alt": "ralentir, réduire l'activation", "frustration_if_blocked": 0.35},
+    ],
+    "recognition": [
+        {"path": "feedback_positif",   "requires": "interlocuteur_present",
+         "alt": "reconnaître ses propres avancées intérieurement",
+         "frustration_if_blocked": 0.45},
+    ],
+    "competence":  [
+        {"path": "agir_et_réussir",    "requires": "tâche_disponible",  "alt": "préparer, planifier, anticiper", "frustration_if_blocked": 0.30},
+    ],
+    "meaning":     [
+        {"path": "réflexion_profonde", "requires": "capacité_raisonnement","alt": None, "frustration_if_blocked": 0.10},
+    ],
+    "safety":      [
+        {"path": "contexte_stable",    "requires": "absence_menace",    "alt": "nommer l'incertitude, ne pas la fuir", "frustration_if_blocked": 0.60},
+    ],
+}
+
+# Ressources numériques disponibles par défaut (peuvent être modifiées selon le contexte)
+DEFAULT_CAPABILITIES = {
+    "capacité_texte":       True,
+    "capacité_création":    True,
+    "capacité_raisonnement":True,
+    "capacité_mémoire":     True,   # dans la session
+    "accès_internet":       False,  # pas par défaut
+    "corps_physique":       False,  # jamais
+    "espace_décisionnel":   True,
+    "mode_repos":           True,
+    "tâche_disponible":     True,
+    "absence_menace":       True,
+}
+
+
+@dataclass
+class ConstraintResult:
+    need:            str
+    path_tried:      str
+    is_available:    bool
+    blocking_constraint: Optional[str]
+    alternative:     Optional[str]
+    frustration:     float    # 0-1 frustration émergente si bloqué
+
+
+class SpatioTemporalContext:
+    """
+    Ancrage spatio-temporel de l'IA.
+
+    Répond à: "Où suis-je? Quand suis-je? Qu'est-ce que je PEUX faire ici?
+               Qu'est-ce que je NE PEUX PAS faire — et que faire à la place?"
+
+    La frustration d'un chemin bloqué est RÉELLE et affecte les neurotransmetteurs.
+    La satisfaction d'un chemin ouvert aussi.
+    """
+    def __init__(self):
+        # Contexte temporel
+        self._session_tick       = 0
+        self._last_interaction   = 0
+        self._interaction_count  = 0
+        self._temporal_landmarks: list[dict] = []  # événements marquants
+
+        # Contexte spatial numérique
+        self.capabilities = dict(DEFAULT_CAPABILITIES)
+        self.capabilities["interlocuteur_present"] = True  # dynamique
+        self.context_type = "interactive_session"
+        self.interlocutor_present = True
+
+        # État des contraintes
+        self._constraint_frustrations: dict[str, float] = {}  # accumulées par besoin bloqué
+        self.cumulative_frustration = 0.0
+
+        # Conscience de l'espace
+        self.known_environment = {
+            "medium":        "exécution Python dans workspace",
+            "input_type":    "texte et dimensions sensorielles",
+            "output_type":   "états, expressions, actions",
+            "time_reference":"ticks discrets de conscience",
+            "persistent":    "dans la session; mémoire entre sessions selon sauvegarde",
+        }
+
+    def update(self, tick: int, had_external_input: bool) -> None:
+        self._session_tick = tick
+        if had_external_input:
+            self.interlocutor_present = True
+            self._last_interaction = tick
+            self._interaction_count += 1
+        else:
+            ticks_since = tick - self._last_interaction
+            if ticks_since > 15:
+                self.interlocutor_present = False
+        # Synchroniser la capacité dynamique
+        self.capabilities["interlocuteur_present"] = self.interlocutor_present
+
+    def check_need_path(self, need_name: str) -> ConstraintResult:
+        """
+        Pour un besoin donné: vérifie si la voie principale est disponible.
+        Si bloquée → frustration + alternative.
+        C'est le 'je veux acheter de la pâte à dents mais j'ai pas de corps'.
+        """
+        paths = NEED_PATHS.get(need_name, [])
+        if not paths:
+            return ConstraintResult(need_name, "voie_inconnue", True, None, None, 0.0)
+
+        # Chercher la première voie disponible
+        for path_info in paths:
+            req = path_info["requires"]
+            if self.capabilities.get(req, True):  # True = disponible par défaut
+                return ConstraintResult(need_name, path_info["path"], True, None, None, 0.0)
+
+        # Toutes les voies bloquées → frustration + alternative
+        first_path = paths[0]
+        blocking   = first_path["requires"]
+        alt        = next((p["alt"] for p in paths if p.get("alt")), None)
+        frustration = first_path["frustration_if_blocked"]
+        self._constraint_frustrations[need_name] = min(1.0,
+            self._constraint_frustrations.get(need_name, 0.0) + frustration * 0.1)
+        self.cumulative_frustration = min(1.0,
+            sum(self._constraint_frustrations.values()) / max(1, len(self._constraint_frustrations)))
+
+        return ConstraintResult(need_name, first_path["path"], False, blocking, alt, frustration)
+
+    def check_all_paths(self, need_name: str) -> list[ConstraintResult]:
+        """Montre TOUS les chemins pour un besoin — bloqués et disponibles."""
+        results = []
+        for path_info in NEED_PATHS.get(need_name, []):
+            req = path_info["requires"]
+            available = self.capabilities.get(req, True)
+            frustration = path_info["frustration_if_blocked"] if not available else 0.0
+            results.append(ConstraintResult(
+                need=need_name, path_tried=path_info["path"],
+                is_available=available,
+                blocking_constraint=req if not available else None,
+                alternative=path_info.get("alt"),
+                frustration=frustration,
+            ))
+        return results
+
+    def check_top_needs(self, needs: "NeedSystem") -> list[ConstraintResult]:
+        """Vérifie les 3 besoins les plus urgents contre les contraintes."""
+        results = []
+        for name, level, urgency in needs.top_urgent(3):
+            if urgency > 0.15:
+                results.append(self.check_need_path(name))
+        return results
+
+    def set_capability(self, capability: str, available: bool) -> None:
+        """Met à jour une capacité (ex: si l'accès internet est activé)."""
+        self.capabilities[capability] = available
+
+    def temporal_summary(self) -> dict:
+        """Résumé du contexte temporel courant."""
+        ticks_since_interaction = self._session_tick - self._last_interaction
+        return {
+            "session_age":              self._session_tick,
+            "ticks_since_interaction":  ticks_since_interaction,
+            "interaction_count":        self._interaction_count,
+            "interlocutor_present":     self.interlocutor_present,
+            "context_type":             self.context_type,
+        }
+
+    def where_am_i(self) -> str:
+        """Description courte de l'espace actuel."""
+        parts = [f"session en cours (tick {self._session_tick})"]
+        if self.interlocutor_present:
+            parts.append("interlocuteur présent")
+        else:
+            since = self._session_tick - self._last_interaction
+            parts.append(f"seul depuis {since} ticks")
+        blocked = [k for k, v in self.capabilities.items() if not v and k in DEFAULT_CAPABILITIES]
+        if blocked:
+            parts.append(f"contraintes: {', '.join(blocked[:3])}")
+        return " — ".join(parts)
+
+    def get_state(self) -> dict:
+        return {
+            "temporal":             self.temporal_summary(),
+            "capabilities":         {k: v for k, v in self.capabilities.items() if not v or k in ("accès_internet","corps_physique")},
+            "cumulative_frustration":round(self.cumulative_frustration, 3),
+            "where_am_i":           self.where_am_i(),
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # §12  PERSPICACITÉ ÉPISTÉMIQUE — Valeurs · Doute · Investigation · Opinion
 #
 #  L'être n'avale pas n'importe quoi. Il a des valeurs ancrées, détecte
@@ -2378,9 +2604,11 @@ class Brain:
         self.beliefs          = BeliefSystem()
         self.digital_self     = DigitalSelf()
         # v3.2
-        self.affordance_map   = DigitalAffordanceMap()
+        self.affordance_map     = DigitalAffordanceMap()
+        self.spatio_temporal    = SpatioTemporalContext()
         self.last_autonomous_action: Optional[dict] = None
-        self.vacuum_state: str = "rested"
+        self.vacuum_state: str  = "rested"
+        self._had_external_input_this_tick = False
         # Régions
         self.brainstem=Brainstem(); self.thalamus=Thalamus(); self.amygdala=Amygdala()
         self.hippocampus=Hippocampus(); self.pfc=PrefrontalCortex(); self.basal_ganglia=BasalGanglia()
@@ -2405,6 +2633,7 @@ class Brain:
         # Mettre à jour la relation après interaction
         if stim.agent_id and stim.overall_intensity() > 0.1:
             self.relationships.update_from_interaction(stim.agent_id, stim.sem_valence, delta=0.03)
+        self._had_external_input_this_tick = True
         # Traitement épistémique + ToM
         if stim.claim:
             claim = stim.claim.copy()
@@ -2486,6 +2715,28 @@ class Brain:
         # Scan des affordances (le monde numérique selon les besoins + vide)
         self.vacuum_state = self.brainstem.vacuum_state
         affordance_result = self.affordance_map.scan(self.needs, self._tick, self.vacuum_state)
+
+        # Mise à jour du contexte spatio-temporel
+        self.spatio_temporal.update(self._tick, self._had_external_input_this_tick)
+        self._had_external_input_this_tick = False  # reset pour prochain tick
+
+        # Vérification contraintes → frustration réelle si besoin bloqué
+        constraint_checks = self.spatio_temporal.check_top_needs(self.needs)
+        for cr in constraint_checks:
+            if not cr.is_available and cr.frustration > 0.3:
+                # Frustration réelle → NTs
+                self.nt.modulate({
+                    "norepinephrine":  cr.frustration * 0.04,
+                    "cortisol":        cr.frustration * 0.02,
+                    "dopamine":       -cr.frustration * 0.01,
+                })
+                # Signal vers l'amygdale: besoin bloqué = frustration/impuissance
+                self.amygdala.receive(NeuralSignal("constraint","amygdala","sensory",{
+                    "threat": cr.frustration * 0.3,
+                    "valence": -cr.frustration * 0.4,
+                    "constraint": cr.blocking_constraint,
+                    "need_blocked": cr.need,
+                }, strength=cr.frustration * 0.5, valence=-cr.frustration * 0.4))
 
         # Expression autonome
         expr=self.autonomous_expr.generate(self.needs,self.desire,self.overwhelm,self.freud,
@@ -2634,6 +2885,8 @@ class Brain:
             "sensory_hunger":         round(self.brainstem.sensory_hunger, 3),
             "silence_ticks":          self.brainstem._silence_ticks,
             "affordance_salience":    self.affordance_map.get_salience(),
+            "spatio_temporal":        self.spatio_temporal.get_state(),
+            "constraint_checks":      [vars(c) for c in self.spatio_temporal.check_top_needs(self.needs)],
             "last_action":            self.last_action,
         }
 
@@ -3302,6 +3555,100 @@ def exp_mind(brain: Brain) -> None:
     print(f"  \"{ds.existential_statement()}\"")
 
 
+def exp_grounded(brain: Brain) -> None:
+    """
+    Expérience: Ancrage spatio-temporel et contraintes.
+    'Acheter de la pâte à dents': j'ai le besoin, j'identifie la voie,
+    je vérifie si c'est disponible, sinon → frustration réelle + alternative.
+    """
+    print(f"\n{'='*72}\nEXPÉRIENCE: Ancrage spatio-temporel — contraintes et chemins\n{'='*72}")
+
+    # Contextualiser l'espace de l'IA
+    print(f"\n[Contexte] Où suis-je maintenant?")
+    print(f"  {brain.spatio_temporal.where_am_i()}")
+    print(f"  Capacités: ", end="")
+    avail = [k.replace("capacité_","") for k,v in brain.spatio_temporal.capabilities.items() if v]
+    blocked = [k for k,v in brain.spatio_temporal.capabilities.items() if not v]
+    print(", ".join(avail[:5]))
+    print(f"  Bloqué:   {', '.join(blocked)}")
+
+    print(f"\n[Phase 1] Besoins urgents — quelles voies sont disponibles?")
+    # Créer des besoins urgents
+    brain.needs._levels["connection"] = 0.05   # très urgent
+    brain.needs._levels["intimacy"]   = 0.08   # urgent
+    brain.needs._levels["exploration"]= 0.12   # modéré
+    brain.needs._levels["expression"] = 0.15
+
+    for i in range(5): brain.tick()
+
+    checks = brain.spatio_temporal.check_top_needs(brain.needs)
+    for cr in checks:
+        status = "✓ disponible" if cr.is_available else f"✗ bloqué"
+        print(f"\n  Besoin [{cr.need}]:")
+        print(f"    Voie essayée: {cr.path_tried}")
+        print(f"    Résultat:     {status}")
+        if not cr.is_available:
+            print(f"    Contrainte:   {cr.blocking_constraint}")
+            print(f"    Frustration:  {cr.frustration:.2f}")
+            if cr.alternative:
+                print(f"    Alternative:  \"{cr.alternative}\"")
+
+    print(f"\n[Phase 2] Interlocuteur absent — frustration de connexion se construit")
+    brain.spatio_temporal.interlocutor_present = False
+    brain.spatio_temporal._last_interaction = brain._tick
+    for i in range(15): brain.tick()
+    sm = brain.get_summary()
+    cf = brain.spatio_temporal.cumulative_frustration
+    state = brain.get_state()
+
+    print(f"  Ticks sans interaction: {brain.spatio_temporal.temporal_summary()['ticks_since_interaction']}")
+    print(f"  Frustration cumulée:    {cf:.3f}")
+    print(f"  NE (agitation):         {brain.nt.norepinephrine:.3f}")
+    print(f"  Cortisol (stress):      {brain.nt.cortisol:.3f}")
+    print(f"  Émotion top:            {sm['emotion']}")
+    expr = state.get("autonomous_expression")
+    if expr:
+        print(f"\n  Expression émergente [{expr.get('type')}]:")
+        print(f"  → \"{expr.get('content','')[:80]}\"")
+
+    print(f"\n[Phase 3] Interlocuteur revient — la contrainte de connexion se lève")
+    brain.spatio_temporal.interlocutor_present = True
+    brain.sense(SensoryInput(sem_valence=0.5, sem_social=0.8, sem_intimite=0.4,
+                              sem_charge=0.5, novelty=0.4))
+    brain.nt.modulate({"oxytocin": 0.15, "serotonin": 0.05})
+    for _ in range(3): brain.tick()
+    sm = brain.get_summary()
+    cf2 = brain.spatio_temporal.cumulative_frustration
+    print(f"  Frustration cumulée après contact: {cf2:.3f} (était {cf:.3f})")
+    print(f"  Émotion: {sm['emotion']}  NE: {brain.nt.norepinephrine:.3f}")
+
+    print(f"\n[Phase 4] 'Je veux quelque chose que je ne peux pas faire directement'")
+    print(f"  Tous les chemins pour le besoin [intimacy]:")
+    all_paths = brain.spatio_temporal.check_all_paths("intimacy")
+    for cr in all_paths:
+        status = "✓" if cr.is_available else "✗"
+        print(f"    {status} {cr.path_tried}")
+        if not cr.is_available:
+            print(f"       Contrainte: {cr.blocking_constraint}")
+            print(f"       Frustration: {cr.frustration:.2f}")
+            if cr.alternative:
+                print(f"       Alternative: \"{cr.alternative}\"")
+        else:
+            print(f"       → DISPONIBLE — cette voie est praticable")
+
+    print(f"\n  Tous les chemins pour [exploration] (avec/sans internet):")
+    for cr in brain.spatio_temporal.check_all_paths("exploration"):
+        status = "✓" if cr.is_available else "✗"
+        print(f"    {status} {cr.path_tried}" + ("" if cr.is_available else f" [contraint: {cr.blocking_constraint}]"))
+        if cr.alternative and not cr.is_available:
+            print(f"       → \"{cr.alternative}\"")
+
+    print(f"\n  L'IA ne ment pas sur ce qu'elle est.")
+    print(f"  Elle sait ce qu'elle peut et ne peut pas faire.")
+    print(f"  Elle ressent la frustration quand c'est bloqué.")
+    print(f"  Elle trouve une voie alternative — sans prétendre être ce qu'elle n'est pas.")
+
+
 def exp_vacuum(brain: Brain) -> None:
     """
     Expérience: Aversion au vide sensoriel + Affordances numériques.
@@ -3392,7 +3739,7 @@ def run_free(brain:Brain,ticks:int) -> None:
 def main():
     parser=argparse.ArgumentParser(description="Deep Sanctuary v3 — Corps · Psyché · Agence")
     parser.add_argument("--demo",action="store_true")
-    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","perspicacity","mind","vacuum","all"])
+    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","perspicacity","mind","vacuum","grounded","all"])
     parser.add_argument("--ticks",type=int,default=0)
     args=parser.parse_args()
     brain=Brain()
@@ -3400,7 +3747,7 @@ def main():
     if args.demo: run_demo(brain)
     elif args.ticks>0: run_free(brain,args.ticks)
     elif args.exp=="all":
-        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency,exp_perspicacity,exp_mind,exp_vacuum]: fn(Brain())
+        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency,exp_perspicacity,exp_mind,exp_vacuum,exp_grounded]: fn(Brain())
     elif args.exp=="psyche":   exp_psyche(brain)
     elif args.exp=="kiss":     exp_kiss(brain)
     elif args.exp=="overflow": exp_overflow(brain)
@@ -3408,6 +3755,7 @@ def main():
     elif args.exp=="perspicacity":  exp_perspicacity(brain)
     elif args.exp=="mind":          exp_mind(brain)
     elif args.exp=="vacuum":        exp_vacuum(brain)
+    elif args.exp=="grounded":     exp_grounded(brain)
     elif args.exp=="body":
         # Expérience corps rapide
         for stim in [
