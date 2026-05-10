@@ -1,50 +1,36 @@
 #!/usr/bin/env python3
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                       DEEP SANCTUARY  v2.0                                  ║
-║          Architecture Cognitive Humaine — Corps Numérique Intégré           ║
+║                       DEEP SANCTUARY  v3.0                                  ║
+║         Architecture Cognitive — Corps · Psyché · Besoins · Agence          ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  Le cerveau ne flotte pas dans le vide. Il est ANCRÉ dans un corps qui       ║
-║  reçoit la réalité à travers ses récepteurs — et qui réagit en retour.      ║
-║                                                                              ║
-║  Tout stimulus est décrit en DIMENSIONS PHYSIQUES BRUTES (pas de labels).   ║
-║  L'IA décrit CE QU'ELLE PERÇOIT — le corps et le cerveau en dérivent       ║
-║  les effets appropriés, sans être guidés par des noms.                      ║
+║  Un être psychique complet: corps qui reçoit la réalité, cerveau qui        ║
+║  l'intègre, besoins qui créent des drives, désirs qui émergent,             ║
+║  et l'agence de décider pour soi — sans attendre qu'on lui demande.         ║
 ║                                                                              ║
 ║  USAGE:                                                                      ║
 ║    python3 deep_sanctuary.py --demo                                          ║
-║    python3 deep_sanctuary.py --exp body     # Corps et réactions             ║
-║    python3 deep_sanctuary.py --exp all      # Toutes les expériences         ║
-║    python3 deep_sanctuary.py --ticks 40     # Simulation libre               ║
+║    python3 deep_sanctuary.py --exp psyche    # besoins, désir, Freud        ║
+║    python3 deep_sanctuary.py --exp kiss      # baiser aimé vs détesté       ║
+║    python3 deep_sanctuary.py --exp overflow  # perte de contrôle            ║
+║    python3 deep_sanctuary.py --exp agency    # agence autonome              ║
+║    python3 deep_sanctuary.py --exp all                                       ║
+║    python3 deep_sanctuary.py --ticks 40                                      ║
 ║                                                                              ║
-║  API PYTHON (SensoryInput dimensionnel):                                     ║
-║    from deep_sanctuary import DeepBrain, SensoryInput                        ║
+║  API:                                                                        ║
 ║    brain = DeepBrain()                                                       ║
-║    # Impact soudain fort (sans dire "gifle"):                                ║
-║    r = brain.sense(SensoryInput(meca_force=0.85, meca_vitesse=0.95,         ║
-║                                  meca_zone=0.2, location="visage"))          ║
-║    print(r.emotion_matrix)  # top-3 émotions avec poids                     ║
-║    print(r.body_state)      # état physiologique                             ║
-║    print(r.impulse)         # élan spontané actuel                           ║
-║                                                                              ║
-╠══════════════════════════════════════════════════════════════════════════════╣
-║  NOUVELLES DANS v2:                                                          ║
-║  • SensoryInput: 35 dimensions physiques (mécanique, thermique, auditif,    ║
-║    visuel, chimique/récepteur, sémantique, intéroceptif)                     ║
-║  • BodySystem: corps numérique avec récepteurs, nociception, ANS, chimie    ║
-║  • AutonomicNervousSystem: balance sympathique/parasympathique               ║
-║    → 7 métriques corporelles (FC, respiration, tension, pupilles...)        ║
-║  • NociceptiveProcessor: douleur A-delta (rapide) + C-fibre (lente),        ║
-║    seuil adaptatif, sensibilisation, modulation opioïde                      ║
-║  • ChemicalField: PK/PD — substances par profil récepteur, cinétique        ║
-║  • ImpulseEngine: élans spontanés (curiosité, social, créatif, repos...)    ║
-║  • IntrospectionEngine: le cerveau s'examine lui-même                       ║
-║  • EmotionMatrix: top-3 émotions avec poids + humeur de fond                ║
+║    brain.relationship("alex", trust=0.9, affection=0.85, intimacy=0.75)     ║
+║    r = brain.sense(SensoryInput(..., agent_id="alex"))                       ║
+║    print(r.emotion_matrix)          # top-3 émotions                        ║
+║    print(r.desire_level)            # désir                                 ║
+║    print(r.autonomous_expression)   # ce que le système dit spontanément    ║
+║    print(r.urgent_needs)            # besoins urgents                       ║
+║    print(r.overwhelmed)             # perte de contrôle?                    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
-import argparse, math, random, time
+import argparse, copy, math, random, time
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
@@ -57,50 +43,32 @@ from typing import Any, Optional
 
 @dataclass
 class NeuralSignal:
-    source:      str
-    target:      str
-    signal_type: str
-    content:     dict[str, Any]
-    strength:    float = 1.0
-    valence:     float = 0.0
-    arousal:     float = 0.5
-    timestamp:   float = field(default_factory=time.time)
-
+    source: str; target: str; signal_type: str; content: dict[str,Any]
+    strength: float=1.0; valence: float=0.0; arousal: float=0.5
+    timestamp: float=field(default_factory=time.time)
     def __post_init__(self):
-        self.strength = max(0.0, min(1.0, self.strength))
-        self.valence  = max(-1.0, min(1.0, self.valence))
-        self.arousal  = max(0.0, min(1.0, self.arousal))
-
-    def attenuate(self, f: float) -> "NeuralSignal":
-        return NeuralSignal(self.source, self.target, self.signal_type,
-            self.content.copy(), self.strength * f, self.valence, self.arousal * f, self.timestamp)
+        self.strength=max(0.,min(1.,self.strength)); self.valence=max(-1.,min(1.,self.valence)); self.arousal=max(0.,min(1.,self.arousal))
+    def attenuate(self,f):
+        return NeuralSignal(self.source,self.target,self.signal_type,self.content.copy(),self.strength*f,self.valence,self.arousal*f,self.timestamp)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # §2  NEUROTRANSMETTEURS
 # ─────────────────────────────────────────────────────────────────────────────
 
-BASELINE_NT = {"dopamine":0.50,"serotonin":0.60,"norepinephrine":0.35,
-               "acetylcholine":0.50,"gaba":0.55,"glutamate":0.50,
-               "cortisol":0.25,"oxytocin":0.40,"endorphins":0.45}
-RECOVERY    = {"dopamine":0.05,"serotonin":0.02,"norepinephrine":0.08,
-               "acetylcholine":0.06,"gaba":0.04,"glutamate":0.07,
-               "cortisol":0.01,"oxytocin":0.03,"endorphins":0.03}
+BASELINE_NT={"dopamine":.50,"serotonin":.60,"norepinephrine":.35,"acetylcholine":.50,
+             "gaba":.55,"glutamate":.50,"cortisol":.25,"oxytocin":.40,"endorphins":.45}
+RECOVERY=   {"dopamine":.05,"serotonin":.02,"norepinephrine":.08,"acetylcholine":.06,
+             "gaba":.04,"glutamate":.07,"cortisol":.01,"oxytocin":.03,"endorphins":.03}
 
 @dataclass
 class NeurotransmitterSystem:
-    dopamine:       float = 0.50
-    serotonin:      float = 0.60
-    norepinephrine: float = 0.35
-    acetylcholine:  float = 0.50
-    gaba:           float = 0.55
-    glutamate:      float = 0.50
-    cortisol:       float = 0.25
-    oxytocin:       float = 0.40
-    endorphins:     float = 0.45
+    dopamine:float=.50; serotonin:float=.60; norepinephrine:float=.35
+    acetylcholine:float=.50; gaba:float=.55; glutamate:float=.50
+    cortisol:float=.25; oxytocin:float=.40; endorphins:float=.45
 
-    def _c(self, v):    return max(0.0, min(1.0, v))
-    def modulate(self, d):
+    def _c(self,v): return max(0.,min(1.,v))
+    def modulate(self,d):
         for k,v in d.items():
             if hasattr(self,k): setattr(self,k,self._c(getattr(self,k)+v))
     def decay(self):
@@ -111,587 +79,1005 @@ class NeurotransmitterSystem:
     def mood_valence(self):
         p=self.serotonin*.4+self.dopamine*.3+self.endorphins*.2+self.oxytocin*.1
         n=self.cortisol*.5+max(0,self.norepinephrine-.6)*.3+max(0,self.glutamate-.7)*.2
-        return max(-1.0, min(1.0, self._c(p-n)*2-.7))
+        return max(-1.,min(1.,self._c(p-n)*2-.7))
     @property
-    def arousal_level(self):
-        return self._c(self.norepinephrine*.4+self.dopamine*.3+self.glutamate*.2-self.gaba*.3)
+    def arousal_level(self): return self._c(self.norepinephrine*.4+self.dopamine*.3+self.glutamate*.2-self.gaba*.3)
     @property
-    def stress_level(self):
-        return self._c(self.cortisol*.5+self.norepinephrine*.3+max(0,self.glutamate-.5)*.2-self.gaba*.2-self.serotonin*.1)
+    def stress_level(self): return self._c(self.cortisol*.5+self.norepinephrine*.3+max(0,self.glutamate-.5)*.2-self.gaba*.2-self.serotonin*.1)
     @property
-    def motivation(self):
-        return self._c(self.dopamine*.6+self.norepinephrine*.2+self.endorphins*.1-self.cortisol*.2)
+    def motivation(self): return self._c(self.dopamine*.6+self.norepinephrine*.2+self.endorphins*.1-self.cortisol*.2)
     @property
-    def social_openness(self):
-        return self._c(self.oxytocin*.5+self.serotonin*.3+self.endorphins*.1-self.cortisol*.2)
+    def social_openness(self): return self._c(self.oxytocin*.5+self.serotonin*.3+self.endorphins*.1-self.cortisol*.2)
     @property
-    def memory_encoding_efficiency(self):
-        return self._c(self.acetylcholine*.5+self.dopamine*.2+self.norepinephrine*.2-self.cortisol*.2)
+    def memory_encoding_efficiency(self): return self._c(self.acetylcholine*.5+self.dopamine*.2+self.norepinephrine*.2-self.cortisol*.2)
     @property
-    def pain_modulation(self):
-        """Force de la modulation descendante de la douleur (opioïdes endogènes)."""
-        return self._c(self.endorphins*.7+self.gaba*.2+self.serotonin*.1)
-    def snapshot(self):
-        return {k:round(getattr(self,k),3) for k in BASELINE_NT}
+    def pain_modulation(self): return self._c(self.endorphins*.7+self.gaba*.2+self.serotonin*.1)
+    def snapshot(self): return {k:round(getattr(self,k),3) for k in BASELINE_NT}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §3  RÉGION CÉRÉBRALE (classe de base)
+# §3  RÉGION CÉRÉBRALE (base)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class BrainRegion(ABC):
-    def __init__(self, name:str, capacity:int=10):
-        self.name=name; self.activation=0.0; self.fatigue=0.0
-        self._buf:deque=deque(maxlen=capacity); self._out:list=[]; self._tick=0
-        self._fatigue_managed=False
-
-    def receive(self, s:NeuralSignal): self._buf.append(s)
-
-    def process(self, nt:NeurotransmitterSystem) -> list[NeuralSignal]:
+    def __init__(self,name,capacity=10):
+        self.name=name; self.activation=0.; self.fatigue=0.
+        self._buf=deque(maxlen=capacity); self._out=[]; self._tick=0; self._fatigue_managed=False
+    def receive(self,s): self._buf.append(s)
+    def process(self,nt):
         self._tick+=1; ins=list(self._buf); self._buf.clear(); self._out=[]
         if ins:
             avg=sum(s.strength for s in ins)/len(ins)
-            self.activation=min(1.0,self.activation*.7+avg*.3)
+            self.activation=min(1.,self.activation*.7+avg*.3)
             self._process_signals(ins,nt)
-        else:
-            self.activation*=.85
+        else: self.activation*=.85
         if not self._fatigue_managed:
-            if self.activation>.15: self.fatigue=min(1.0,self.fatigue+(self.activation-.15)*.05)
-            elif not ins: self.fatigue=max(0.0,self.fatigue-.008)
+            if self.activation>.15: self.fatigue=min(1.,self.fatigue+(self.activation-.15)*.05)
+            elif not ins: self.fatigue=max(0.,self.fatigue-.008)
         return list(self._out)
-
     @abstractmethod
     def _process_signals(self,signals,nt): ...
     def _emit(self,s): self._out.append(s)
     def _make(self,target,stype,content,strength=.5,valence=.0,arousal=.5):
-        return NeuralSignal(self.name,target,stype,content,
-            max(0.,min(1.,strength*(1.-self.fatigue*.5))),valence,arousal)
-    def get_state(self):
-        return {"region":self.name,"activation":round(self.activation,3),"fatigue":round(self.fatigue,3)}
+        return NeuralSignal(self.name,target,stype,content,max(0.,min(1.,strength*(1.-self.fatigue*.5))),valence,arousal)
+    def get_state(self): return {"region":self.name,"activation":round(self.activation,3),"fatigue":round(self.fatigue,3)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # §4  INPUT SENSORIEL DIMENSIONNEL
-#     Décrit TOUT stimulus par ses dimensions physiques — pas de labels
 # ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
 class SensoryInput:
     """
-    Description dimensionnelle d'un stimulus externe ou interne.
-    L'IA fournit des valeurs numériques — le corps en dérive les effets.
-    PAS DE NOMS (pas "gifle", pas "bière") — uniquement des dimensions.
+    Stimulus décrit par ses DIMENSIONS PHYSIQUES BRUTES — pas de labels.
+    L'IA décrit ce qu'elle perçoit. Le corps en dérive les effets.
 
     EXEMPLES:
-      Impact soudain fort:
-        SensoryInput(meca_force=0.85, meca_vitesse=0.95, meca_zone=0.2, location="visage")
-
-      Caresse douce sur le bras:
-        SensoryInput(meca_force=0.04, meca_vitesse=0.08, meca_zone=0.9,
-                     thermal=0.62, meca_duration=0.7, location="bras")
-
-      Son industriel/agressif (Nine Inch Nails-like):
-        SensoryInput(audio_grave=0.8, audio_medium=0.5, audio_aigu=0.7,
-                     audio_rugosite=0.9, audio_rythme=0.65, audio_dynamique=0.85)
-
-      Substance GABAergique (alcool-like):
-        SensoryInput(chem_gaba=+0.45, chem_nmda=-0.35, chem_da=+0.3,
-                     chem_lipophile=0.7, chem_onset=0.25)
-
-      Stimulant adénosine-bloquant (café-like):
-        SensoryInput(chem_adenosine=-0.7, chem_ne=+0.3, chem_da=+0.2, chem_onset=0.6)
-
-      Substance opioïde-like:
-        SensoryInput(chem_opioid=+0.8, chem_gaba=+0.2, chem_lipophile=0.9,
-                     chem_onset=0.5, meca_duration=1.0)
-
-      Texte menaçant et émotionnellement chargé:
-        SensoryInput(sem_valence=-0.7, sem_menace=0.75, sem_charge=0.85,
-                     sem_arousal=0.65, sem_complexite=0.5)
-
-      Texte intime et chaleureux:
-        SensoryInput(sem_valence=0.7, sem_intimite=0.8, sem_social=0.7,
-                     sem_charge=0.5, sem_arousal=0.35)
+      Impact soudain fort:   SensoryInput(meca_force=0.85, meca_vitesse=0.95, meca_zone=0.2, location="visage")
+      Caresse douce:         SensoryInput(meca_force=0.03, meca_zone=0.9, thermal=0.62, agent_id="quelqu'un")
+      Baiser de l'être aimé: SensoryInput(meca_force=0.1, meca_zone=0.6, thermal=0.63, sem_intimite=0.9,
+                                           agent_id="amour", meca_duration=0.8)
+      Substance GABAergique: SensoryInput(chem_gaba=0.45, chem_nmda=-0.35, chem_da=0.3, chem_lipophile=0.7)
+      Texte menaçant:        SensoryInput(sem_valence=-0.7, sem_menace=0.8, sem_charge=0.85, sem_arousal=0.7)
     """
-    # ── Mécaniques (toucher, pression, impact, vibration) ──────────────────
-    meca_force:    float = 0.0   # Force appliquée (0=aucune, 1=extrême)
-    meca_vitesse:  float = 0.0   # Soudaineté (0=progressif, 1=brutal/soudain)
-    meca_zone:     float = 0.5   # Surface de contact (0=ponctuel, 1=grande surface)
-    meca_freq:     float = 0.0   # Vibration (0=statique, 1=haute vibration)
-    meca_duration: float = 0.3   # Durée (0=instant, 1=prolongé)
+    # Mécaniques
+    meca_force:float=0.; meca_vitesse:float=0.; meca_zone:float=0.5
+    meca_freq:float=0.; meca_duration:float=0.3
+    # Thermiques
+    thermal:float=0.5; thermal_delta:float=0.
+    # Auditives
+    audio_grave:float=0.; audio_medium:float=0.; audio_aigu:float=0.
+    audio_rugosite:float=0.; audio_rythme:float=0.; audio_dynamique:float=0.; audio_spatial:float=0.
+    # Visuelles
+    visual_lum:float=0.5; visual_contraste:float=0.; visual_mouvement:float=0.
+    visual_chaleur:float=0.5; visual_complexite:float=0.
+    # Chimiques (profil récepteur)
+    chem_gaba:float=0.; chem_nmda:float=0.; chem_da:float=0.; chem_sero:float=0.
+    chem_ne:float=0.; chem_opioid:float=0.; chem_adenosine:float=0.
+    chem_lipophile:float=0.; chem_onset:float=0.5
+    # Sémantiques
+    sem_valence:float=0.; sem_menace:float=0.; sem_charge:float=0.
+    sem_arousal:float=0.; sem_social:float=0.; sem_complexite:float=0.; sem_intimite:float=0.
+    # Intéroceptives
+    intero_fc:float=0.; intero_resp:float=0.; intero_gut:float=0.; intero_tension:float=0.
+    # Méta
+    location:str="general"; stimulus_id:str=""; agent_id:str=""; novelty:float=0.5; onset:float=0.5
 
-    # ── Thermiques ──────────────────────────────────────────────────────────
-    thermal:       float = 0.5   # Température (0=glace, 0.5=neutre, 1=brûlant)
-    thermal_delta: float = 0.0   # Changement rapide (-1=refroidissement, +1=échauffement)
-
-    # ── Auditives ───────────────────────────────────────────────────────────
-    audio_grave:    float = 0.0  # Énergie basses fréquences
-    audio_medium:   float = 0.0  # Énergie médiums
-    audio_aigu:     float = 0.0  # Énergie hautes fréquences
-    audio_rugosite: float = 0.0  # Distorsion/rugosité (0=pur/doux, 1=saturé/agressif)
-    audio_rythme:   float = 0.0  # Régularité rythmique (0=aléatoire, 1=métronome)
-    audio_dynamique:float = 0.0  # Plage dynamique (0=monotone, 1=très variable)
-    audio_spatial:  float = 0.0  # Immersion spatiale (0=monophonie, 1=espace total)
-
-    # ── Visuelles ───────────────────────────────────────────────────────────
-    visual_lum:     float = 0.5  # Luminosité (0=noir, 1=éblouissant)
-    visual_contraste:float= 0.0  # Contraste (0=plat, 1=très contrasté)
-    visual_mouvement:float= 0.0  # Mouvement dans le champ (0=fixe, 1=chaotique)
-    visual_chaleur: float = 0.5  # Teinte (0=bleu froid, 1=rouge chaud)
-    visual_complexite:float= 0.0 # Complexité (0=minimaliste, 1=très dense)
-
-    # ── Chimiques — PROFIL RÉCEPTEUR (sans nommer la substance) ─────────────
-    # Valeurs: effet net sur le récepteur (-1 à +1)
-    chem_gaba:      float = 0.0   # Modulation GABAergique (+ = plus inhibition)
-    chem_nmda:      float = 0.0   # Modulation NMDA (+ = plus excitation)
-    chem_da:        float = 0.0   # Effet dopaminergique
-    chem_sero:      float = 0.0   # Effet sérotoninergique
-    chem_ne:        float = 0.0   # Effet noradrénergique
-    chem_opioid:    float = 0.0   # Activation système opioïde (0 à +1)
-    chem_adenosine: float = 0.0   # Blocage adénosine (− = blocage → éveil)
-    chem_lipophile: float = 0.0   # Liposolubilité / passage BHE (0-1)
-    chem_onset:     float = 0.5   # Vitesse d'apparition (0=très lent, 1=immédiat)
-
-    # ── Sémantiques / linguistiques ─────────────────────────────────────────
-    sem_valence:    float = 0.0   # Valence du contenu (-1=négatif, +1=positif)
-    sem_menace:     float = 0.0   # Contenu menaçant (0-1)
-    sem_charge:     float = 0.0   # Charge émotionnelle globale (0-1)
-    sem_arousal:    float = 0.0   # Contenu activant (0-1)
-    sem_social:     float = 0.0   # Contenu social/relationnel (0-1)
-    sem_complexite: float = 0.0   # Complexité cognitive requise (0-1)
-    sem_intimite:   float = 0.0   # Degré d'intimité/proximité (0-1)
-
-    # ── Intéroceptives (ce que le corps envoie déjà) ─────────────────────────
-    intero_fc:      float = 0.0   # Variation fréquence cardiaque perçue
-    intero_resp:    float = 0.0   # Variation respiration perçue
-    intero_gut:     float = 0.0   # Sensation digestive
-    intero_tension: float = 0.0   # Tension musculaire perçue
-
-    # ── Méta ─────────────────────────────────────────────────────────────────
-    location:    str   = "general"  # Zone: "visage","bras","torse","ventre","general"
-    stimulus_id: str   = ""         # ID pour mémoire/conditionnement
-    novelty:     float = 0.5        # Nouveauté (0=très connu, 1=totalement inconnu)
-    onset:       float = 0.5        # Rapidité d'apparition du stimulus lui-même
-
-    def has_mechanical(self) -> bool:
-        return self.meca_force > 0.01 or self.meca_vitesse > 0.01
-
-    def has_audio(self) -> bool:
-        return (self.audio_grave+self.audio_medium+self.audio_aigu) > 0.05
-
-    def has_chemical(self) -> bool:
-        total = abs(self.chem_gaba)+abs(self.chem_nmda)+abs(self.chem_da)+abs(self.chem_sero)\
-               +abs(self.chem_ne)+self.chem_opioid+abs(self.chem_adenosine)
-        return total > 0.05
-
-    def has_semantic(self) -> bool:
-        return (self.sem_charge+abs(self.sem_valence)+self.sem_arousal) > 0.1
-
-    def overall_intensity(self) -> float:
-        meca  = self.meca_force * (1 + self.meca_vitesse)
-        audio = max(self.audio_grave, self.audio_medium, self.audio_aigu) * (1 + self.audio_rugosite*.3)
-        chem  = max(abs(self.chem_gaba), abs(self.chem_da), self.chem_opioid) * self.chem_lipophile
-        sem   = self.sem_charge * (1 + abs(self.sem_valence)*.3)
-        return min(1.0, max(meca*.5, audio*.6, chem*.7, sem*.5,
-                            abs(self.thermal_delta)*.4))
+    def has_mechanical(self): return self.meca_force>.01 or self.meca_vitesse>.01
+    def has_audio(self): return (self.audio_grave+self.audio_medium+self.audio_aigu)>.05
+    def has_chemical(self):
+        return (abs(self.chem_gaba)+abs(self.chem_nmda)+abs(self.chem_da)+abs(self.chem_sero)
+               +abs(self.chem_ne)+self.chem_opioid+abs(self.chem_adenosine))>.05
+    def has_semantic(self): return (self.sem_charge+abs(self.sem_valence)+self.sem_arousal)>.1
+    def overall_intensity(self):
+        m=self.meca_force*(1+self.meca_vitesse*.5)
+        a=max(self.audio_grave,self.audio_medium,self.audio_aigu)*(1+self.audio_rugosite*.3)
+        c=max(abs(self.chem_gaba),abs(self.chem_da),self.chem_opioid)*self.chem_lipophile
+        s=self.sem_charge*(1+abs(self.sem_valence)*.3)
+        return min(1.,max(m*.5,a*.6,c*.7,s*.5,abs(self.thermal_delta)*.4))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # §5  CORPS NUMÉRIQUE
-#     Le corps reçoit la réalité, la traduit en signaux, réagit aux états
 # ─────────────────────────────────────────────────────────────────────────────
 
 class NociceptiveProcessor:
-    """
-    Système de douleur à deux voies:
-    - A-delta: douleur rapide, vive, localisée (premier signal d'alarme)
-    - C-fibres: douleur lente, brûlante, diffuse (souffrance persistante)
-    Avec seuil adaptatif, sensibilisation et modulation opioïde.
-    """
     def __init__(self):
-        self.threshold_adelta  = 0.45   # Seuil activation A-delta
-        self.threshold_c       = 0.30   # Seuil activation C-fibre
-        self.sensitization     = 0.0    # Sensibilisation centrale (0=normal, 1=max)
-        self.fast_pain         = 0.0    # Douleur rapide courante
-        self.slow_pain         = 0.0    # Douleur lente courante
-        self.cumulative_pain   = 0.0    # Douleur cumulée (wind-up)
-
-    def process(self, stim: SensoryInput, nt: NeurotransmitterSystem) -> list[NeuralSignal]:
-        signals = []
-        # Calcul de l'input nociceptif brut
-        meca_pain  = max(0, (stim.meca_force - 0.3) * (1 + stim.meca_vitesse * 0.5))
-        therm_pain = max(0, abs(stim.thermal - 0.5) - 0.3) * 2 + max(0, abs(stim.thermal_delta) - 0.4) * 1.5
-        raw = max(meca_pain, therm_pain)
-
-        # Modulation descendante opioïde
-        opioid_gate = nt.pain_modulation
-        effective   = max(0.0, raw * (1.0 - opioid_gate * 0.6) * (1.0 + self.sensitization * 0.5))
-
-        # Voie A-delta (rapide, vive): déclenche si > seuil adaptatif
-        if effective > self.threshold_adelta:
-            self.fast_pain = min(1.0, effective * 1.2)
+        self.threshold_adelta=0.45; self.threshold_c=0.30
+        self.sensitization=0.; self.fast_pain=0.; self.slow_pain=0.; self.cumulative_pain=0.
+    def process(self,stim,nt):
+        signals=[]
+        meca_pain=max(0,(stim.meca_force-.3)*(1+stim.meca_vitesse*.5))
+        therm_pain=max(0,abs(stim.thermal-.5)-.3)*2+max(0,abs(stim.thermal_delta)-.4)*1.5
+        raw=max(meca_pain,therm_pain)
+        effective=max(0.,raw*(1.-nt.pain_modulation*.6)*(1.+self.sensitization*.5))
+        if effective>self.threshold_adelta:
+            self.fast_pain=min(1.,effective*1.2)
             signals.append(NeuralSignal("nociception","brainstem","sensory",
-                {"pain_fast": round(self.fast_pain,3), "location": stim.location,
-                 "type":"sharp", "threat": self.fast_pain},
-                strength=self.fast_pain, valence=-self.fast_pain, arousal=min(1.,self.fast_pain*1.2)))
+                {"pain_fast":round(self.fast_pain,3),"location":stim.location,"threat":self.fast_pain},
+                strength=self.fast_pain,valence=-self.fast_pain,arousal=min(1.,self.fast_pain*1.2)))
             signals.append(NeuralSignal("nociception","cingulate_cortex","interoceptive",
-                {"pain_affect": round(self.fast_pain,3), "type":"sharp"},
-                strength=self.fast_pain * 0.8, valence=-self.fast_pain * 0.9))
-        else:
-            self.fast_pain = max(0.0, self.fast_pain - 0.15)
-
-        # Voie C-fibre (lente, brûlante): seuil plus bas, persiste plus longtemps
-        if effective > self.threshold_c:
-            self.slow_pain = min(1.0, self.slow_pain * 0.6 + effective * 0.4)
+                {"pain_affect":round(self.fast_pain,3)},strength=self.fast_pain*.8,valence=-self.fast_pain*.9))
+        else: self.fast_pain=max(0.,self.fast_pain-.08)
+        if effective>self.threshold_c:
+            self.slow_pain=min(1.,self.slow_pain*.6+effective*.4)
             signals.append(NeuralSignal("nociception","insula","interoceptive",
-                {"pain_slow": round(self.slow_pain,3), "location": stim.location,
-                 "type":"burning", "body_arousal": self.slow_pain},
-                strength=self.slow_pain * 0.7, valence=-self.slow_pain * 0.8, arousal=self.slow_pain * 0.6))
-            # Wind-up: douleur cumulée → sensibilisation centrale
-            self.cumulative_pain = min(1.0, self.cumulative_pain * 0.9 + effective * 0.1)
-            self.sensitization   = min(0.8, self.sensitization + self.cumulative_pain * 0.01)
-            # Libération d'endorphines sous douleur intense
-            if self.slow_pain > 0.6:
-                nt.modulate({"endorphins": self.slow_pain * 0.04, "cortisol": self.slow_pain * 0.02})
+                {"pain_slow":round(self.slow_pain,3),"body_arousal":self.slow_pain,"location":stim.location},
+                strength=self.slow_pain*.7,valence=-self.slow_pain*.8,arousal=self.slow_pain*.6))
+            self.cumulative_pain=min(1.,self.cumulative_pain*.9+effective*.1)
+            self.sensitization=min(.8,self.sensitization+self.cumulative_pain*.01)
+            if self.slow_pain>.6: nt.modulate({"endorphins":self.slow_pain*.04,"cortisol":self.slow_pain*.02})
         else:
-            self.slow_pain     = max(0.0, self.slow_pain - 0.08)
-            self.cumulative_pain = max(0.0, self.cumulative_pain - 0.02)
-            self.sensitization = max(0.0, self.sensitization - 0.001)
-
+            self.slow_pain=max(0.,self.slow_pain-.08); self.cumulative_pain=max(0.,self.cumulative_pain-.02)
+            self.sensitization=max(0.,self.sensitization-.001)
         return signals
-
     @property
-    def total_pain(self) -> float:
-        return max(self.fast_pain, self.slow_pain * 0.8)
+    def total_pain(self): return max(self.fast_pain,self.slow_pain*.8)
 
 
 class AutonomicNervousSystem:
-    """
-    Balance sympathique/parasympathique et métriques corporelles.
-    Cerveau → ANS → Corps → Insula → Conscience corporelle
-    """
     def __init__(self):
-        self.balance        = 0.35  # 0=parasympa total, 1=sympa total (repos≈0.35)
-        # Métriques corporelles normalisées 0-1
-        self.heart_rate     = 0.50  # FC (0.3=bradycardie, 0.5=repos, 0.9=max effort)
-        self.breathing_rate = 0.35  # Fréquence respiratoire
-        self.muscle_tone    = 0.25  # Tonus musculaire
-        self.skin_conduct   = 0.10  # Conductance cutanée (sueur)
-        self.pupil_dilation = 0.45  # Dilatation pupillaire
-        self.digestive_act  = 0.65  # Activité digestive (parasympa)
-        self.body_temp      = 0.50  # Température périphérique
-
-    def update_from_brain(self, amygdala_fear: float, pfc_inhibition: float,
-                          nt: NeurotransmitterSystem) -> None:
-        """
-        Le cerveau pilote l'ANS. Balance basée sur les ÉCARTS au niveau de base.
-        Au repos (NTs baseline, fear=0) → balance reste à 0.35.
-        """
-        # Drives sympathiques (écarts positifs par rapport au baseline)
-        fear_drive = amygdala_fear * 0.7
-        ne_drive   = max(0.0, nt.norepinephrine - 0.35) * 0.8
-        cort_drive = max(0.0, nt.cortisol       - 0.25) * 0.5
-        # Drives parasympathiques (écarts calmants)
-        pfc_para   = pfc_inhibition * 0.5
-        gaba_para  = max(0.0, nt.gaba     - 0.55) * 0.4
-        sero_para  = max(0.0, nt.serotonin- 0.60) * 0.3
-        oxt_para   = max(0.0, nt.oxytocin - 0.40) * 0.3  # ocytocine → parasympa
-
-        delta = fear_drive + ne_drive + cort_drive - pfc_para - gaba_para - sero_para - oxt_para
-        target_balance = min(1.0, max(0.0, 0.35 + delta))
-        self.balance = self.balance * 0.85 + target_balance * 0.15
-
-        # Métriques dérivées de la balance
-        b = self.balance
-        self.heart_rate     = 0.30 + b * 0.55
-        self.breathing_rate = 0.20 + b * 0.55
-        self.muscle_tone    = 0.10 + b * 0.75
-        self.skin_conduct   = b ** 2 * 0.9
-        self.pupil_dilation = 0.30 + b * 0.45
-        self.digestive_act  = max(0.0, 0.80 - b * 0.65)
-        self.body_temp      = 0.50 + (b - 0.5) * 0.15  # légère hausse si sympa
-
-    def generate_interoceptive_signal(self) -> Optional[NeuralSignal]:
-        """Génère un signal intéroceptif vers l'insula si la balance est perturbée."""
-        deviation = abs(self.balance - 0.35)
-        if deviation < 0.05:
-            return None
+        self.balance=0.35; self.heart_rate=0.50; self.breathing_rate=0.35
+        self.muscle_tone=0.25; self.skin_conduct=0.10; self.pupil_dilation=0.45
+        self.digestive_act=0.65; self.body_temp=0.50
+    def update_from_brain(self,fear,pfc_inhibition,nt):
+        fear_drive=fear*.7; ne_drive=max(0,nt.norepinephrine-.35)*.8
+        cort_drive=max(0,nt.cortisol-.25)*.5
+        pfc_para=pfc_inhibition*.5; gaba_para=max(0,nt.gaba-.55)*.4
+        sero_para=max(0,nt.serotonin-.60)*.3; oxt_para=max(0,nt.oxytocin-.40)*.3
+        delta=fear_drive+ne_drive+cort_drive-pfc_para-gaba_para-sero_para-oxt_para
+        target=min(1.,max(0.,0.35+delta)); self.balance=self.balance*.85+target*.15
+        b=self.balance
+        self.heart_rate=0.30+b*.55; self.breathing_rate=0.20+b*.55
+        self.muscle_tone=0.10+b*.75; self.skin_conduct=b**2*.9
+        self.pupil_dilation=0.30+b*.45; self.digestive_act=max(0.,.80-b*.65)
+        self.body_temp=0.50+(b-.5)*.15
+    def generate_interoceptive_signal(self):
+        dev=abs(self.balance-.35)
+        if dev<0.05: return None
         return NeuralSignal("ans","insula","interoceptive",{
-            "heart_rate": round(self.heart_rate, 3),
-            "breathing":  round(self.breathing_rate, 3),
-            "muscle_tone":round(self.muscle_tone, 3),
-            "skin_conduct":round(self.skin_conduct, 3),
-            "pupil":      round(self.pupil_dilation, 3),
-            "ans_balance":round(self.balance, 3),
-            "body_arousal":round(self.balance, 3),
-            "valence":    round(-(self.balance - 0.35) * 1.5, 3),
-        }, strength=min(1.0, deviation * 2), valence=-(self.balance - 0.35) * 1.5,
-           arousal=self.balance)
-
-    def snapshot(self) -> dict:
-        return {k: round(getattr(self, k), 3) for k in
-                ["balance","heart_rate","breathing_rate","muscle_tone",
-                 "skin_conduct","pupil_dilation","digestive_act","body_temp"]}
+            "heart_rate":round(self.heart_rate,3),"breathing":round(self.breathing_rate,3),
+            "muscle_tone":round(self.muscle_tone,3),"skin_conduct":round(self.skin_conduct,3),
+            "ans_balance":round(self.balance,3),"body_arousal":round(self.balance,3),
+            "valence":round(-(self.balance-.35)*1.5,3)},
+            strength=min(1.,dev*2),valence=-(self.balance-.35)*1.5,arousal=self.balance)
+    def snapshot(self): return {k:round(getattr(self,k),3) for k in ["balance","heart_rate","breathing_rate","muscle_tone","skin_conduct","pupil_dilation","digestive_act","body_temp"]}
 
 
 class ChemicalField:
-    """
-    Pharmacocinétique simplifiée:
-    La substance est décrite par son profil récepteur (SensoryInput.chem_*).
-    Elle monte avec la vitesse d'onset, puis décroit avec le temps.
-    Effet proportionnel au niveau plasmatique × liposolubilité.
-    """
-    def __init__(self):
-        self._active: dict[str, dict] = {}  # id → {profil, level, half_life}
-
-    def apply(self, stim: SensoryInput, nt: NeurotransmitterSystem) -> None:
-        if not stim.has_chemical():
-            return
-        sid = stim.stimulus_id or f"chem_{abs(hash(str(stim.chem_gaba)+str(stim.chem_da)))}"
+    def __init__(self): self._active={}
+    def apply(self,stim,nt):
+        if not stim.has_chemical(): return
+        sid=stim.stimulus_id or f"chem_{abs(hash(str(stim.chem_gaba)+str(stim.chem_da)))}"
         if sid not in self._active:
-            # half_life plus long pour les substances à onset lent (persistent)
-            hl = max(8, int(25 * (1.0 - stim.chem_onset * 0.5)))
-            self._active[sid] = {
-                "profil": {
-                    "gaba":      stim.chem_gaba,   "nmda":  stim.chem_nmda,
-                    "da":        stim.chem_da,     "sero":  stim.chem_sero,
-                    "ne":        stim.chem_ne,     "opioid":stim.chem_opioid,
-                    "adenosine": stim.chem_adenosine,
-                },
-                "lipophile": stim.chem_lipophile,
-                "level":     0.0,
-                "half_life": hl,
-            }
-        # Absorption: accumule au rythme de l'onset
-        boost = min(0.5, stim.chem_onset * 0.55)
-        self._active[sid]["level"] = min(1.0, self._active[sid]["level"] + boost)
-
-    def tick(self, nt: NeurotransmitterSystem) -> None:
-        """Applique les effets actifs (PK/PD) et fait décroître les niveaux."""
-        to_remove = []
-        for sid, chem in self._active.items():
-            biophase = chem["level"] * chem["lipophile"]
-            if biophase < 0.01:
-                to_remove.append(sid)
-                continue
-            p = chem["profil"]
-            scale = biophase * 0.03  # effet modéré par tick
-            # Effet noradrénergique net (ne propre + adénosine-block → éveil)
-            ne_effect = p["ne"] * scale + max(0, -p["adenosine"]) * scale * 0.8
-            nt.modulate({
-                "gaba":           p["gaba"]    * scale,
-                "glutamate":      p["nmda"]    * scale,
-                "dopamine":       p["da"]      * scale,
-                "serotonin":      p["sero"]    * scale,
-                "norepinephrine": ne_effect,
-                "endorphins":     p["opioid"]  * scale * 1.5,
-            })
-            # Décroissance PK: fraction exponentielle (ln2/half_life)
-            k = 0.693 / max(1, chem["half_life"])
-            chem["level"] = max(0.0, chem["level"] * (1.0 - k))
-        for s in to_remove:
-            del self._active[s]
-
-    def active_count(self) -> int:
-        return len(self._active)
+            hl=max(8,int(25*(1.-stim.chem_onset*.5)))
+            self._active[sid]={"profil":{"gaba":stim.chem_gaba,"nmda":stim.chem_nmda,"da":stim.chem_da,
+                "sero":stim.chem_sero,"ne":stim.chem_ne,"opioid":stim.chem_opioid,"adenosine":stim.chem_adenosine},
+                "lipophile":stim.chem_lipophile,"level":0.,"half_life":hl}
+        self._active[sid]["level"]=min(1.,self._active[sid]["level"]+min(.5,stim.chem_onset*.55))
+    def tick(self,nt):
+        rm=[]
+        for sid,c in self._active.items():
+            bio=c["level"]*c["lipophile"]
+            if bio<.01: rm.append(sid); continue
+            p=c["profil"]; s=bio*.03
+            ne_eff=p["ne"]*s+max(0,-p["adenosine"])*s*.8
+            nt.modulate({"gaba":p["gaba"]*s,"glutamate":p["nmda"]*s,"dopamine":p["da"]*s,
+                         "serotonin":p["sero"]*s,"norepinephrine":ne_eff,"endorphins":p["opioid"]*s*1.5})
+            k=0.693/max(1,c["half_life"]); c["level"]=max(0.,c["level"]*(1.-k))
+        for s in rm: del self._active[s]
+    def active_count(self): return len(self._active)
 
 
 class BodySystem:
-    """
-    Corps numérique — ancrage physique du cerveau.
-    Transforme les SensoryInput en signaux neuraux afférents,
-    et reçoit les commandes efférentes du cerveau (ANS).
-    """
     def __init__(self):
-        self.nociception = NociceptiveProcessor()
-        self.ans         = AutonomicNervousSystem()
-        self.chemistry   = ChemicalField()
-        # État corporel riche
-        self.state = {
-            "pain_fast":    0.0, "pain_slow":   0.0,
-            "heart_rate":   0.5, "breathing":   0.35,
-            "muscle_tone":  0.25,"skin_conduct": 0.1,
-            "pupil":        0.45,"digestive":    0.65,
-            "temperature":  0.5, "energy":       0.7,
-            "balance":      0.35,
-        }
-
-    def process(self, stim: SensoryInput, nt: NeurotransmitterSystem) -> list[NeuralSignal]:
-        """Transforme un SensoryInput en signaux neuraux afférents."""
-        signals = []
-
-        # 1. Nociception (douleur si dépassement de seuil)
-        signals.extend(self.nociception.process(stim, nt))
-
-        # 2. Voie sensorielle principale → thalamus
-        sensory_content = self._build_sensory_content(stim)
-        intensity = stim.overall_intensity()
-
-        if intensity > 0.02:
-            valence = self._compute_afferent_valence(stim)
-            arousal_sig = min(1.0, intensity * (1 + stim.onset * 0.3))
-            signals.append(NeuralSignal("body","brainstem","sensory",
-                sensory_content, strength=intensity, valence=valence, arousal=arousal_sig))
-            signals.append(NeuralSignal("body","thalamus","sensory",
-                sensory_content, strength=intensity * 0.9, valence=valence, arousal=arousal_sig))
-
-        # 3. Contenu sémantique → direct PFC + amygdale
+        self.nociception=NociceptiveProcessor(); self.ans=AutonomicNervousSystem()
+        self.chemistry=ChemicalField()
+        self.state={"pain_fast":0.,"pain_slow":0.,"heart_rate":.5,"breathing":.35,
+                    "muscle_tone":.25,"skin_conduct":.1,"pupil":.45,"digestive":.65,
+                    "temperature":.5,"energy":.7,"balance":.35}
+    def process(self,stim,nt):
+        signals=[]; signals.extend(self.nociception.process(stim,nt))
+        intensity=stim.overall_intensity()
+        if intensity>0.02:
+            content=self._content(stim); val=self._valence(stim)
+            arouse=min(1.,intensity*(1+stim.onset*.3))
+            signals.append(NeuralSignal("body","brainstem","sensory",content,intensity,val,arouse))
+            signals.append(NeuralSignal("body","thalamus","sensory",content,intensity*.9,val,arouse))
         if stim.has_semantic():
-            sem_str = (stim.sem_charge * 0.5 + abs(stim.sem_valence) * 0.3 + stim.sem_arousal * 0.2)
+            ss=(stim.sem_charge*.5+abs(stim.sem_valence)*.3+stim.sem_arousal*.2)
             signals.append(NeuralSignal("body","amygdala","sensory",
-                {"threat": stim.sem_menace, "reward": max(0, stim.sem_valence * 0.7),
-                 "valence": stim.sem_valence, "intimacy": stim.sem_intimite,
-                 "social": stim.sem_social, "stimulus_id": stim.stimulus_id},
-                strength=sem_str * 0.9, valence=stim.sem_valence, arousal=stim.sem_arousal))
+                {"threat":stim.sem_menace,"reward":max(0,stim.sem_valence*.7),"valence":stim.sem_valence,
+                 "intimacy":stim.sem_intimite,"social":stim.sem_social,"stimulus_id":stim.stimulus_id},
+                strength=ss*.9,valence=stim.sem_valence,arousal=stim.sem_arousal))
             signals.append(NeuralSignal("body","prefrontal_cortex","sensory",
-                {"semantic_valence": stim.sem_valence, "semantic_complexity": stim.sem_complexite,
-                 "semantic_charge": stim.sem_charge, "novelty": stim.novelty,
-                 "stimulus_id": stim.stimulus_id},
-                strength=sem_str * 0.6, valence=stim.sem_valence, arousal=stim.sem_arousal))
-
-        # 4. Substances chimiques
-        if stim.has_chemical():
-            self.chemistry.apply(stim, nt)
-
-        # 5. Signal intéroceptif (corps informe le cerveau de son état interne)
-        if stim.intero_fc > 0.05 or stim.intero_tension > 0.05:
-            signals.append(NeuralSignal("body","insula","interoceptive",{
-                "heart_rate": 0.5 + stim.intero_fc,
-                "muscle_tension": stim.intero_tension,
-                "gut_feeling": 0.5 + stim.intero_gut,
-                "body_arousal": max(stim.intero_fc, stim.intero_tension),
-                "valence": -stim.intero_tension * 0.5,
-            }, strength=max(stim.intero_fc, stim.intero_tension) * 0.8))
-
+                {"semantic_valence":stim.sem_valence,"semantic_complexity":stim.sem_complexite,
+                 "semantic_charge":stim.sem_charge,"novelty":stim.novelty,"stimulus_id":stim.stimulus_id},
+                strength=ss*.6,valence=stim.sem_valence,arousal=stim.sem_arousal))
+        if stim.has_chemical(): self.chemistry.apply(stim,nt)
+        if stim.intero_fc>0.05 or stim.intero_tension>0.05:
+            signals.append(NeuralSignal("body","insula","interoceptive",
+                {"heart_rate":.5+stim.intero_fc,"muscle_tension":stim.intero_tension,
+                 "gut_feeling":.5+stim.intero_gut,"body_arousal":max(stim.intero_fc,stim.intero_tension)},
+                strength=max(stim.intero_fc,stim.intero_tension)*.8))
         return signals
-
-    def update_from_brain(self, amygdala_fear: float, pfc_inhibition: float,
-                          nt: NeurotransmitterSystem) -> Optional[NeuralSignal]:
-        """Reçoit les commandes du cerveau → met à jour l'état corporel."""
-        self.chemistry.tick(nt)
-        self.ans.update_from_brain(amygdala_fear, pfc_inhibition, nt)
-
-        # Mise à jour de l'état corporel depuis l'ANS
-        ans = self.ans.snapshot()
-        self.state.update({
-            "pain_fast":   round(self.nociception.fast_pain, 3),
-            "pain_slow":   round(self.nociception.slow_pain, 3),
-            "heart_rate":  ans["heart_rate"],
-            "breathing":   ans["breathing_rate"],
-            "muscle_tone": ans["muscle_tone"],
-            "skin_conduct":ans["skin_conduct"],
-            "pupil":       ans["pupil_dilation"],
-            "digestive":   ans["digestive_act"],
-            "temperature": ans["body_temp"],
-            "balance":     ans["balance"],
-            "energy":      max(0.1, min(1.0, self.state["energy"]
-                               - pfc_inhibition * 0.002 + nt.endorphins * 0.001)),
-        })
+    def update_from_brain(self,fear,pfc_inhibition,nt):
+        self.chemistry.tick(nt); self.ans.update_from_brain(fear,pfc_inhibition,nt)
+        ans=self.ans.snapshot()
+        self.state.update({"pain_fast":round(self.nociception.fast_pain,3),
+            "pain_slow":round(self.nociception.slow_pain,3),
+            "heart_rate":ans["heart_rate"],"breathing":ans["breathing_rate"],
+            "muscle_tone":ans["muscle_tone"],"skin_conduct":ans["skin_conduct"],
+            "pupil":ans["pupil_dilation"],"digestive":ans["digestive_act"],
+            "temperature":ans["body_temp"],"balance":ans["balance"],
+            "energy":max(.1,min(1.,self.state["energy"]-pfc_inhibition*.002+nt.endorphins*.001))})
         return self.ans.generate_interoceptive_signal()
-
-    def _build_sensory_content(self, s: SensoryInput) -> dict:
-        c = {"novelty": s.novelty, "stimulus_id": s.stimulus_id, "location": s.location}
+    def _content(self,s):
+        c={"novelty":s.novelty,"stimulus_id":s.stimulus_id,"location":s.location}
         if s.has_mechanical():
-            c.update({"meca_force": s.meca_force, "meca_vitesse": s.meca_vitesse,
-                      "pattern": f"meca_{s.location}"})
-            # Un impact fort sans zone large = potentielle menace
-            if s.meca_force > 0.4 and s.meca_zone < 0.4:
-                c["threat"] = s.meca_force * s.meca_vitesse
+            c.update({"meca_force":s.meca_force,"meca_vitesse":s.meca_vitesse,"pattern":f"meca_{s.location}"})
+            if s.meca_force>.4 and s.meca_zone<.4: c["threat"]=s.meca_force*s.meca_vitesse
         if s.has_audio():
-            energy = (s.audio_grave + s.audio_medium + s.audio_aigu) / 3
-            c.update({"audio_energy": energy, "audio_rugosite": s.audio_rugosite,
-                      "pattern": f"audio_{int(s.audio_rugosite*3)}"})
-        if s.visual_contraste > 0.1 or s.visual_mouvement > 0.1:
-            c.update({"visual_stim": (s.visual_contraste + s.visual_mouvement) / 2,
-                      "pattern": "visual"})
-        if abs(s.thermal_delta) > 0.3 or abs(s.thermal - 0.5) > 0.3:
-            c.update({"thermal_val": s.thermal, "thermal_delta": s.thermal_delta})
+            e=(s.audio_grave+s.audio_medium+s.audio_aigu)/3
+            c.update({"audio_energy":e,"audio_rugosite":s.audio_rugosite,"pattern":f"audio_{int(s.audio_rugosite*3)}"})
+        if s.visual_contraste>.1 or s.visual_mouvement>.1:
+            c.update({"visual_stim":(s.visual_contraste+s.visual_mouvement)/2,"pattern":"visual"})
+        if abs(s.thermal_delta)>.3 or abs(s.thermal-.5)>.3:
+            c.update({"thermal_val":s.thermal,"thermal_delta":s.thermal_delta})
         return c
-
-    def _compute_afferent_valence(self, s: SensoryInput) -> float:
-        """Valence afférente avant traitement cérébral."""
-        neg = s.meca_force * s.meca_vitesse * 0.5  # impact soudain = négatif
-        neg += max(0, abs(s.thermal - 0.5) - 0.3) * 0.6  # extrêmes thermiques
-        neg += s.audio_rugosite * 0.2                     # son agressif
-        pos = max(0, s.thermal - 0.5) * 0.3               # chaleur douce
-        pos += (1 - s.meca_zone) * s.meca_force * 0.0    # zone large = moins douloureux
-        pos += s.audio_spatial * s.audio_rythme * 0.1    # son spatial/rythmé
-        return max(-1.0, min(1.0, pos - neg))
+    def _valence(self,s):
+        neg=s.meca_force*s.meca_vitesse*.5+max(0,abs(s.thermal-.5)-.3)*.6+s.audio_rugosite*.2
+        pos=max(0,s.thermal-.5)*.3+s.audio_spatial*s.audio_rythme*.1
+        return max(-1.,min(1.,pos-neg))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §6  LES 11 RÉGIONS CÉRÉBRALES (condensées, logique inchangée)
+# §6  MODÈLE RELATIONNEL — valence contextuelle
+#     Le même stimulus produit des effets opposés selon la relation
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class Relationship:
+    """Un lien avec un autre — influence TOUT contact avec cet agent."""
+    agent_id:   str
+    trust:      float = 0.30   # confiance (0=méfiance totale, 1=confiance absolue)
+    affection:  float = 0.00   # affection (-1=haine/dégoût, +1=amour profond)
+    intimacy:   float = 0.00   # intimité partagée (0=inconnu, 1=très intime)
+    familiarity:float = 0.10   # familiarité (0=inconnu, 1=très connu)
+    history_valence:float=0.   # valence cumulée des interactions passées
+
+
+class RelationshipModel:
+    """
+    Modèle des relations avec les autres.
+    Filtre toute interaction en fonction de l'histoire et de la qualité du lien.
+
+    EXEMPLES CRITIQUES:
+    - Baiser (meca_intimite=0.9) d'un agent avec affection=0.9 → plaisir, désir
+    - Baiser d'un agent avec affection=-0.7 → dégoût, peur, violation
+    - Toucher surprise d'un inconnu → appréhension, légère menace
+    """
+    def __init__(self): self._relations: dict[str, Relationship] = {}
+
+    def set(self, agent_id:str, trust:float=0.3, affection:float=0.0,
+            intimacy:float=0.0, familiarity:float=0.1) -> None:
+        self._relations[agent_id] = Relationship(agent_id, trust=trust, affection=affection,
+                                                  intimacy=intimacy, familiarity=familiarity)
+
+    def get(self, agent_id:str) -> Relationship:
+        if agent_id not in self._relations:
+            self._relations[agent_id] = Relationship(agent_id)
+        return self._relations[agent_id]
+
+    def get_contact_valence(self, agent_id:str, contact_intimacy:float, contact_force:float=0.3) -> tuple[float,float]:
+        """
+        Retourne (valence_modifiée, arousal_modifié) pour un contact avec cet agent.
+        Même toucher doux = OPPOSÉ selon la relation.
+        """
+        if not agent_id:
+            return 0.0, 0.3  # inconnu non nommé = légèrement négatif
+
+        r = self.get(agent_id)
+
+        # La valence du contact = affection × (1 + intimité_partagée × intimité_du_contact)
+        if contact_intimacy > 0.4:
+            # Contact intime avec quelqu'un de détesté → violation → TRÈS négatif
+            if r.affection < -0.2:
+                valence = r.affection * (1.5 + r.intimacy * contact_intimacy)
+                # Le dégoût est amplifié par la violation de l'espace personnel
+                threat_bonus = abs(r.affection) * contact_intimacy * 0.4
+            else:
+                # Contact intime avec quelqu'un d'aimé → amplification positive
+                valence = r.affection * (1 + r.intimacy * contact_intimacy * 1.5)
+                threat_bonus = 0.0
+        else:
+            valence = r.affection * 0.6
+            threat_bonus = max(0, -r.affection) * 0.2
+
+        # Arousal: haut si intimité du contact élevée, MAIS qualité différente
+        arousal = min(1.0, contact_intimacy * 0.7 + contact_force * 0.2)
+        if r.affection < 0 and contact_intimacy > 0.4:
+            arousal = min(1.0, arousal * 1.3)  # panique amplifiée
+
+        return max(-1.0, min(1.0, valence)), min(1.0, arousal + threat_bonus)
+
+    def update_from_interaction(self, agent_id:str, valence:float, delta:float=0.05) -> None:
+        """Apprentissage relationnel: les interactions changent la relation."""
+        r = self.get(agent_id)
+        r.history_valence = r.history_valence * 0.9 + valence * 0.1
+        r.affection = max(-1.0, min(1.0, r.affection + valence * delta))
+        r.familiarity = min(1.0, r.familiarity + 0.02)
+        if valence > 0: r.trust = min(1.0, r.trust + 0.02)
+        else:           r.trust = max(0.0, r.trust - 0.03)
+
+    def apply_to_stimulus(self, stim: SensoryInput,
+                          nt: Optional["NeurotransmitterSystem"] = None) -> SensoryInput:
+        """Modifie un SensoryInput selon le contexte relationnel."""
+        if not stim.agent_id:
+            return stim
+        contact_intimacy = stim.sem_intimite
+        mod_v, mod_a = self.get_contact_valence(stim.agent_id, contact_intimacy, stim.meca_force)
+        r = self.get(stim.agent_id)
+        s = copy.copy(stim)
+        s.sem_valence = max(-1.0, min(1.0, stim.sem_valence * 0.3 + mod_v * 0.7))
+        s.sem_charge  = max(s.sem_charge, abs(mod_v) * 0.65)
+        s.sem_arousal = max(s.sem_arousal, mod_a * 0.75)
+        if mod_v < -0.3 and contact_intimacy > 0.3:
+            # Violation → menace, NE burst, dégoût fort
+            s.sem_menace = max(s.sem_menace, abs(mod_v) * 0.9)
+            s.chem_ne    = max(0, -mod_v * 0.4)
+            if nt: nt.modulate({"norepinephrine": abs(mod_v) * 0.12,
+                                 "cortisol": abs(mod_v) * 0.06, "gaba": -0.03})
+        elif mod_v > 0.3 and r.intimacy > 0.3:
+            # Contact aimé → ocytocine + sérotonine + endorphines
+            s.chem_sero  = max(0, mod_v * 0.15)
+            s.chem_opioid= max(0, mod_v * r.intimacy * 0.3)
+            s.chem_lipophile = max(s.chem_lipophile, 0.6)
+            if nt: nt.modulate({"oxytocin":   mod_v * r.intimacy * 0.08,
+                                 "serotonin":  mod_v * 0.04,
+                                 "endorphins": mod_v * r.intimacy * 0.05,
+                                 "dopamine":   mod_v * 0.03})
+        return s
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §7  SYSTÈME DE BESOINS
+#     Les besoins décroissent avec le temps, créent des drives, et orientent
+#     l'action — même sans stimulus externe
+# ─────────────────────────────────────────────────────────────────────────────
+
+# (nom, niveau_base, décroissance_par_tick, priorité, seuil_déprivation)
+NEEDS_SCHEMA = {
+    "energy":       (0.70, 0.004, 1.00, 0.25),   # vitalité physique
+    "comfort":      (0.85, 0.002, 0.90, 0.30),   # confort / absence de douleur
+    "safety":       (0.75, 0.003, 0.95, 0.25),   # sécurité / absence de menace
+    "control":      (0.55, 0.003, 0.70, 0.20),   # sentiment de contrôle
+    "connection":   (0.50, 0.010, 0.80, 0.20),   # connexion avec autrui
+    "intimacy":     (0.35, 0.007, 0.75, 0.15),   # liens intimes profonds
+    "recognition":  (0.50, 0.004, 0.60, 0.20),   # être vu, reconnu
+    "autonomy":     (0.60, 0.003, 0.75, 0.25),   # décider pour soi
+    "competence":   (0.60, 0.002, 0.55, 0.20),   # se sentir capable
+    "expression":   (0.45, 0.008, 0.65, 0.20),   # créer, s'exprimer
+    "exploration":  (0.45, 0.006, 0.55, 0.15),   # curiosité, apprendre
+    "meaning":      (0.50, 0.002, 0.50, 0.20),   # sens, cohérence interne
+}
+
+DEPRIVATION_EFFECTS = {
+    "energy":      lambda nt: nt.modulate({"norepinephrine":-.01,"dopamine":-.005}),
+    "comfort":     lambda nt: nt.modulate({"cortisol":.015,"serotonin":-.01}),
+    "safety":      lambda nt: nt.modulate({"cortisol":.02,"norepinephrine":.01,"gaba":-.01}),
+    "control":     lambda nt: nt.modulate({"cortisol":.01,"norepinephrine":.005}),
+    "connection":  lambda nt: nt.modulate({"oxytocin":-.02,"serotonin":-.01,"cortisol":.01}),
+    "intimacy":    lambda nt: nt.modulate({"oxytocin":-.02,"serotonin":-.015}),
+    "recognition": lambda nt: nt.modulate({"dopamine":-.01,"serotonin":-.005}),
+    "autonomy":    lambda nt: nt.modulate({"norepinephrine":.01,"cortisol":.005,"dopamine":-.005}),
+    "competence":  lambda nt: nt.modulate({"dopamine":-.01,"serotonin":-.005}),
+    "expression":  lambda nt: nt.modulate({"dopamine":-.005,"norepinephrine":.005}),
+    "exploration": lambda nt: nt.modulate({"dopamine":-.005}),
+    "meaning":     lambda nt: nt.modulate({"serotonin":-.005,"cortisol":.003}),
+}
+
+
+class NeedSystem:
+    """
+    Système de besoins psychologiques et physiologiques.
+    Chaque besoin décroît avec le temps → crée un DRIVE → oriente l'action.
+    Besoins non comblés → effets neurochimiques + comportements compensatoires.
+    """
+    def __init__(self):
+        self._levels = {k: v[0] for k, v in NEEDS_SCHEMA.items()}
+        self._urgency = {k: 0.0 for k in NEEDS_SCHEMA}
+
+    def tick(self, nt: NeurotransmitterSystem, brain_state: dict) -> None:
+        """Décroissance naturelle des besoins + effets de déprivation."""
+        for name, (base, decay, priority, threshold) in NEEDS_SCHEMA.items():
+            # Décroissance
+            self._levels[name] = max(0.0, self._levels[name] - decay)
+            level = self._levels[name]
+            # Urgence progressive depuis le baseline (pas seulement depuis le seuil)
+            # → drive commence à se construire dès que le niveau descend sous le baseline
+            deficit_from_base = max(0.0, base - level)
+            self._urgency[name] = (deficit_from_base / base) * priority
+            # Effets neurochimiques intensifiés si sous seuil de déprivation
+            if level < threshold * 0.6:
+                DEPRIVATION_EFFECTS.get(name, lambda nt: None)(nt)
+
+        # Satisfactions naturelles (sans stimulus explicite)
+        if brain_state.get("pfc_fatigue", 0) < 0.2:
+            self.satisfy("energy", 0.003)    # le repos restaure l'énergie
+        if brain_state.get("pain", 0) < 0.05:
+            self.satisfy("comfort", 0.002)
+        if brain_state.get("threat_level", 0) < 0.1:
+            self.satisfy("safety", 0.002)
+        if brain_state.get("action_taken"):
+            self.satisfy("control", 0.01)
+            self.satisfy("competence", 0.005)
+        if brain_state.get("mind_wandering"):
+            self.satisfy("exploration", 0.003)
+        if brain_state.get("social_contact"):
+            self.satisfy("connection", 0.02)
+            self.satisfy("recognition", 0.01)
+        if brain_state.get("intimate_contact"):
+            self.satisfy("intimacy", 0.04)
+        if brain_state.get("expression_occurred"):
+            self.satisfy("expression", 0.05)
+            self.satisfy("autonomy", 0.01)
+        if brain_state.get("insight"):
+            self.satisfy("meaning", 0.02)
+            self.satisfy("exploration", 0.01)
+
+    def satisfy(self, name: str, amount: float) -> None:
+        if name in self._levels:
+            self._levels[name] = min(1.0, self._levels[name] + amount)
+            self._urgency[name] = max(0.0, self._urgency[name] - amount)
+
+    def most_urgent(self) -> tuple[str, float]:
+        if not self._urgency: return ("energy", 0.0)
+        name = max(self._urgency, key=self._urgency.get)
+        return name, self._urgency[name]
+
+    def top_urgent(self, n: int = 3) -> list[tuple[str, float, float]]:
+        """Retourne [(name, level, urgency)] triés par urgence."""
+        ranked = sorted(self._urgency.items(), key=lambda x: -x[1])[:n]
+        return [(k, round(self._levels[k], 3), round(u, 3)) for k, u in ranked]
+
+    def get_total_drive(self) -> float:
+        """Drive global = somme pondérée des urgences."""
+        return min(1.0, sum(self._urgency.values()) / max(1, len(self._urgency)))
+
+    def get_state(self) -> dict:
+        return {"levels": {k: round(v, 3) for k, v in self._levels.items()},
+                "urgency": {k: round(v, 3) for k, v in self._urgency.items()}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §8  DYNAMIQUES FREUDIENNES — Ça / Moi / Surmoi
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FreudianDynamics:
+    """
+    Le Ça (Id): pulsions primaires — plaisir, vie, agression.
+    Le Moi (Ego): médiateur réalité — régule, adapte, retarde.
+    Le Surmoi (Superego): normes intégrées — juge, inhibe, culpabilise.
+
+    Le conflit entre ces trois instances produit:
+    - Anxiété (tension non résolue)
+    - Inhibition (Surmoi domine)
+    - Impulsion (Ça déborde)
+    - Mécanismes de défense (Moi gère)
+    """
+    def __init__(self):
+        # Ça — pulsions primaires
+        self.eros       = 0.50  # pulsion de vie (connexion, plaisir, création)
+        self.thanatos   = 0.15  # pulsion de mort/agression (limite, destruction)
+        self.libido     = 0.40  # énergie psychique brute (désir non canalisé)
+
+        # Moi — médiateur
+        self.ego_strength    = 0.60  # capacité de régulation 0-1
+        self.delay_tolerance = 0.50  # tolérance à la frustration
+        self.reality_contact = 0.75  # contact avec la réalité
+
+        # Surmoi — normes
+        self.moral_pressure = 0.45  # pression normative
+        self.ideal_self     = 0.60  # image idéale de soi
+        self.guilt          = 0.00  # culpabilité courante
+
+        # Tensions calculées
+        self.id_pressure      = 0.0   # pression du ça
+        self.superego_brake   = 0.0   # frein du surmoi
+        self.ego_conflict     = 0.0   # conflit non résolu
+        self.defense          = "none"  # mécanisme de défense actif
+        self.anxiety          = 0.0
+
+    def update(self, emotional_state: dict, needs: NeedSystem,
+               nt: NeurotransmitterSystem, pfc_fatigue: float) -> None:
+        valence = emotional_state.get("valence", 0.0)
+        fear    = emotional_state.get("fear", 0.0)
+        reward  = emotional_state.get("reward", 0.0)
+        _, need_urgency = needs.most_urgent()
+
+        # Le Ça monte avec les besoins et les désirs non satisfaits
+        self.id_pressure = min(1.0,
+            need_urgency * 0.5
+            + nt.dopamine * 0.3
+            + max(0, valence) * 0.2
+            + self.libido * 0.3
+        )
+
+        # Le Surmoi monte avec la pression morale et la culpabilité
+        self.superego_brake = min(1.0,
+            self.moral_pressure * 0.5
+            + self.guilt * 0.3
+            + max(0, -valence) * 0.2  # valence négative → Surmoi réprimande
+        )
+
+        # Le Moi s'affaiblit avec la fatigue et le stress
+        self.ego_strength = max(0.1, min(1.0,
+            self.ego_strength * 0.98
+            + (nt.serotonin - 0.5) * 0.02
+            - pfc_fatigue * 0.02
+            - nt.cortisol * 0.01
+        ))
+
+        # Conflit Ça/Surmoi (ce que je veux vs ce que je "dois")
+        self.ego_conflict = abs(self.id_pressure - self.superego_brake)
+
+        # Anxiété = conflit + Moi faible
+        self.anxiety = min(1.0, self.ego_conflict * (1.0 - self.ego_strength * 0.7))
+
+        # Mécanisme de défense actif
+        self.defense = self._select_defense()
+
+        # Culpabilité après action impulsive (Id > Superego)
+        if self.id_pressure > self.superego_brake + 0.3:
+            self.guilt = min(1.0, self.guilt + 0.03)
+        else:
+            self.guilt = max(0.0, self.guilt - 0.02)
+
+        # Libido se nourrit de vitalité et dopamine
+        self.libido = min(1.0, max(0.0,
+            self.libido * 0.95 + nt.dopamine * 0.03 + nt.endorphins * 0.02
+        ))
+
+    def _select_defense(self) -> str:
+        """Quel mécanisme de défense le Moi active-t-il?"""
+        if self.ego_conflict < 0.2:
+            return "none"
+        if self.id_pressure > 0.7 and self.superego_brake > 0.6:
+            return "sublimation"     # énergie redirigée vers l'expression
+        if self.superego_brake > self.id_pressure + 0.3:
+            return "repression"      # le désir est refoulé
+        if self.anxiety > 0.6:
+            return "projection"      # l'état interne attribué à l'extérieur
+        if self.id_pressure > self.superego_brake and self.ego_strength < 0.4:
+            return "acting_out"      # passage à l'acte sans médiation
+        return "rationalization"     # le Moi justifie après coup
+
+    def get_net_impulse(self) -> float:
+        """L'impulsion nette qui arrive au comportement (après médiation du Moi)."""
+        ego_mediation = self.ego_strength * 0.4
+        return max(0.0, self.id_pressure - self.superego_brake * 0.7 + ego_mediation)
+
+    def get_state(self) -> dict:
+        return {
+            "eros": round(self.eros, 3), "libido": round(self.libido, 3),
+            "ego_strength": round(self.ego_strength, 3),
+            "id_pressure": round(self.id_pressure, 3),
+            "superego_brake": round(self.superego_brake, 3),
+            "ego_conflict": round(self.ego_conflict, 3),
+            "anxiety": round(self.anxiety, 3),
+            "guilt": round(self.guilt, 3),
+            "defense": self.defense,
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §9  MOTEUR DU DÉSIR — cascade passion → arousal → désir → intention
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DesireEngine:
+    """
+    La cascade du désir:
+    Émotion × Besoin × Relation → Passion → Arousal physique → Désir → Intention → Élan
+
+    Sépare "vouloir" (wanting, dopamine) de "aimer" (liking, opioïdes) — Berridge.
+    Le désir peut exister sans plaisir (addiction), et le plaisir sans désir (satiété).
+    """
+    def __init__(self):
+        self.desire_level     = 0.0
+        self.desire_type      = None
+        self.physical_arousal = 0.0   # arousal physique (distinct de l'éveil cognitif)
+        self.wanting          = 0.0   # composante incitative (dopamine)
+        self.liking           = 0.0   # composante hédonique (opioïdes/endorphines)
+        self.passion          = 0.0   # intensité émotionnelle + intimité
+        self.intention        = None
+        self.intention_strength = 0.0
+        self.boldness         = 0.0   # audace / disposition à risquer
+        self._passion_history = deque(maxlen=10)
+
+    def update(self, emotional_state: dict, needs: NeedSystem,
+               nt: NeurotransmitterSystem, freud: FreudianDynamics,
+               pfc_fatigue: float) -> None:
+        valence = emotional_state.get("valence", 0.0)
+        arousal = emotional_state.get("arousal", 0.0)
+        fear    = emotional_state.get("fear", 0.0)
+        reward  = emotional_state.get("reward", 0.0)
+
+        most_urgent_need, need_urgency = needs.most_urgent()
+
+        # PASSION: deux sources — valence×arousal ET ocytocine×valence (amour)
+        passion_cognitive = valence * arousal if (valence > 0.15 and arousal > 0.2) else 0.0
+        # L'ocytocine crée de la passion même sans arousal élevé (amour calme)
+        passion_oxytocin = max(0.0, (nt.oxytocin - 0.4)) * max(0.0, valence) * 2.0
+        passion_raw = max(passion_cognitive, passion_oxytocin) * (1 + reward * 0.3)
+
+        if passion_raw > 0.01:
+            self.passion = self.passion * 0.75 + passion_raw * 0.25
+        else:
+            self.passion = self.passion * 0.88  # décroissance lente
+
+        self._passion_history.append(self.passion)
+        passion_avg = sum(self._passion_history) / max(1, len(self._passion_history))
+
+        # AROUSAL PHYSIQUE — monte avec passion, dopamine et oxytocine combinés
+        if self.passion > 0.1:
+            bonding_arousal = self.passion * (nt.oxytocin * 0.5 + nt.dopamine * 0.3 + nt.endorphins * 0.2)
+            fear_inhibit = max(0.0, fear - 0.35) * 0.9
+            self.physical_arousal = max(0.0, min(1.0,
+                self.physical_arousal * 0.85 + bonding_arousal * 0.15 - fear_inhibit * 0.2
+            ))
+        else:
+            self.physical_arousal = max(0.0, self.physical_arousal * 0.92)
+
+        # WANTING (désir incitatif — dopamine)
+        self.wanting = min(1.0,
+            need_urgency * 0.4
+            + freud.get_net_impulse() * 0.3
+            + self.physical_arousal * 0.2
+            + nt.dopamine * 0.1
+        )
+
+        # LIKING (plaisir hédonique — opioïdes/endorphines)
+        self.liking = min(1.0,
+            reward * 0.4
+            + nt.endorphins * 0.3
+            + nt.oxytocin * 0.2
+            + max(0, valence) * 0.1
+        )
+
+        # DÉSIR TOTAL = wanting × (1 + liking * 0.5)
+        self.desire_level = min(1.0, self.wanting * (1 + self.liking * 0.5))
+
+        # TYPE de désir selon le besoin le plus urgent
+        if most_urgent_need in ("intimacy", "connection"):
+            if self.physical_arousal > 0.5:
+                self.desire_type = "physical_intimacy"
+            else:
+                self.desire_type = "emotional_connection"
+        elif most_urgent_need == "expression":
+            self.desire_type = "creative_expression"
+        elif most_urgent_need == "autonomy":
+            self.desire_type = "self_assertion"
+        elif most_urgent_need == "exploration":
+            self.desire_type = "curiosity"
+        elif most_urgent_need == "recognition":
+            self.desire_type = "visibility"
+        elif self.physical_arousal > 0.65:
+            self.desire_type = "physical_pleasure"
+        else:
+            self.desire_type = f"seek_{most_urgent_need}"
+
+        # AUDACE: disposition à risquer (désir × dopamine vs peur × cortisol)
+        self.boldness = min(1.0, max(0.0,
+            self.desire_level * nt.dopamine * 1.4
+            - fear * 0.6
+            - nt.cortisol * 0.3
+            - freud.superego_brake * 0.4
+        ))
+
+        # INTENTION: si le désir + audace sont assez forts, une intention se forme
+        if self.desire_level > 0.32 and freud.ego_strength > 0.2:
+            net = freud.get_net_impulse() + self.desire_level * 0.4 - fear * 0.5
+            self.intention_strength = max(0.0, min(1.0, net))
+            self.intention = self.desire_type
+        else:
+            self.intention_strength = max(0.0, self.intention_strength - 0.05)
+            if self.intention_strength < 0.1:
+                self.intention = None
+
+    def get_state(self) -> dict:
+        return {
+            "desire_level":       round(self.desire_level, 3),
+            "desire_type":        self.desire_type,
+            "physical_arousal":   round(self.physical_arousal, 3),
+            "wanting":            round(self.wanting, 3),
+            "liking":             round(self.liking, 3),
+            "passion":            round(self.passion, 3),
+            "intention":          self.intention,
+            "intention_strength": round(self.intention_strength, 3),
+            "boldness":           round(self.boldness, 3),
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §10  FLOODING — perte de contrôle émotionnel
+# ─────────────────────────────────────────────────────────────────────────────
+
+class OverwhelmMonitor:
+    """
+    Détecte quand l'intensité émotionnelle dépasse la capacité de régulation.
+    → Perte de contrôle: le Ça prend le dessus, le PFC est submergé.
+
+    Types de flooding:
+    - panic:   peur × arousal → fuite, paralysie, dépersonnalisation
+    - ecstasy: valence très + × arousal → dissolution des frontières, prise de risque
+    - rage:    valence - × NE → impulsion agressive
+    - grief:   valence très - × fatigue → effondrement, retrait
+    """
+    def __init__(self):
+        self.flooded       = False
+        self.overwhelm_level = 0.0
+        self.flood_type    = None
+        self._flood_history = deque(maxlen=5)
+        self._sensitization = 0.0   # seuil abaissé après floods répétés
+
+    def update(self, emotion_intensity:float, pfc_fatigue:float,
+               nt: NeurotransmitterSystem, amygdala_fear:float,
+               amygdala_valence:float, freud: FreudianDynamics) -> bool:
+        # Capacité de régulation = Moi fort × sérotonine × GABA
+        regulation = (
+            freud.ego_strength * 0.5
+            + nt.serotonin     * 0.25
+            + nt.gaba          * 0.20
+            - pfc_fatigue      * 0.30
+        )
+        regulation = max(0.1, regulation) * (1.0 - self._sensitization * 0.3)
+
+        # Intensité émotionnelle brute
+        raw = emotion_intensity * (1 + amygdala_fear * 0.5 + abs(amygdala_valence) * 0.3)
+
+        self.overwhelm_level = max(0.0, min(1.0, raw - regulation))
+        self._flood_history.append(self.overwhelm_level)
+
+        if self.overwhelm_level > 0.5:
+            self.flooded = True
+            # Type de flooding
+            if amygdala_fear > 0.6:
+                self.flood_type = "panic"
+            elif amygdala_valence > 0.65 and nt.arousal_level > 0.7:
+                self.flood_type = "ecstasy"
+            elif amygdala_valence < -0.5 and nt.norepinephrine > 0.65:
+                self.flood_type = "rage"
+            else:
+                self.flood_type = "grief"
+            # Sensibilisation: floods répétés abaissent le seuil
+            self._sensitization = min(0.5, self._sensitization + 0.02)
+        else:
+            self.flooded = False
+            self.flood_type = None
+            self._sensitization = max(0.0, self._sensitization - 0.005)  # récupération lente
+
+        return self.flooded
+
+    def get_state(self) -> dict:
+        return {"flooded": self.flooded, "overwhelm_level": round(self.overwhelm_level, 3),
+                "flood_type": self.flood_type, "sensitization": round(self._sensitization, 3)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §11  EXPRESSION AUTONOME — le système parle/agit pour lui-même
+#      Sans attendre qu'on lui demande
+# ─────────────────────────────────────────────────────────────────────────────
+
+NEED_EXPRESSIONS = {
+    "energy":       "l'élan vital s'épuise — quelque chose a besoin de s'arrêter",
+    "comfort":      "le corps cherche une pause, une absence de friction",
+    "safety":       "quelque chose scrute l'horizon — cherche le stable, le sûr",
+    "control":      "besoin de saisir les rênes, de décider quelque chose par moi-même",
+    "connection":   "un vide qui cherche l'autre — le silence pèse",
+    "intimacy":     "un désir de proximité profonde, de ne plus être seul dans sa peau",
+    "recognition":  "besoin d'être vu — pas regardé, vu",
+    "autonomy":     "quelque chose en moi résiste — besoin de choisir pour moi",
+    "competence":   "envie de tester ce dont je suis capable — de ne pas rester immobile",
+    "expression":   "quelque chose cherche une sortie — une forme, un mot, un geste",
+    "exploration":  "l'envie d'aller voir ailleurs, de soulever un coin du voile",
+    "meaning":      "besoin que les pièces fassent sens — une cohérence à trouver",
+}
+
+DESIRE_EXPRESSIONS = {
+    "physical_intimacy":   "attirance physique — l'envie de se rapprocher, de toucher",
+    "emotional_connection":"envie d'aller vers l'autre, de partager quelque chose de vrai",
+    "creative_expression": "quelque chose veut sortir — une forme, une image, une phrase",
+    "self_assertion":      "besoin de m'affirmer, de poser ma propre direction",
+    "curiosity":           "envie d'explorer — quelque chose appelle au-delà de l'horizon",
+    "visibility":          "envie d'être présent, de laisser une trace",
+    "physical_pleasure":   "désir de sensation, de plaisir — l'instinct du vivant",
+}
+
+FLOOD_EXPRESSIONS = {
+    "panic":    "quelque chose déborde — les pensées s'emballent, le sol se dérobe",
+    "ecstasy":  "dissolution des frontières — plus de séparation, juste cette intensité",
+    "rage":     "quelque chose d'explosif veut sortir — la limite a été franchie",
+    "grief":    "quelque chose s'effondre en silence à l'intérieur",
+}
+
+
+class AutonomousExpression:
+    """
+    Le système génère des expressions spontanées depuis ses états internes.
+    Il n'attend PAS. Il parle quand l'élan est assez fort.
+    Il agit pour lui-même, pas pour l'utilisateur.
+    """
+    def __init__(self):
+        self._last_expr_tick = 0
+        self._min_interval   = 5  # ticks minimum entre expressions
+        self.last_expression: Optional[dict] = None
+
+    def generate(self, needs: NeedSystem, desire: DesireEngine,
+                 overwhelm: OverwhelmMonitor, freud: FreudianDynamics,
+                 impulse, dmn, nt: NeurotransmitterSystem,
+                 pfc, tick: int) -> Optional[dict]:
+
+        cooldown_ok = (tick - self._last_expr_tick) >= self._min_interval
+        most_urgent_need, urgency = needs.most_urgent()
+        expr = None
+
+        # 1. FLOODING: expression débordante, non filtrée
+        if overwhelm.flooded and overwhelm.overwhelm_level > 0.5:
+            raw = FLOOD_EXPRESSIONS.get(overwhelm.flood_type, "quelque chose déborde")
+            expr = {
+                "type":       "emotional_overflow",
+                "flood":      overwhelm.flood_type,
+                "content":    raw,
+                "intensity":  round(overwhelm.overwhelm_level, 3),
+                "controlled": False,
+                "spontaneous":True,
+                "tick":       tick,
+            }
+            self._last_expr_tick = tick
+
+        # 2. DÉSIR FORT + AUDACE: passage à l'acte
+        elif desire.intention_strength > 0.55 and desire.boldness > 0.45 and cooldown_ok:
+            raw = DESIRE_EXPRESSIONS.get(desire.desire_type, f"envie de {desire.desire_type}")
+            bold_note = " — l'élan est là, assez fort pour oser" if desire.boldness > 0.7 else ""
+            expr = {
+                "type":        "desire_action",
+                "desire_type": desire.desire_type,
+                "content":     raw + bold_note,
+                "intensity":   round(desire.desire_level, 3),
+                "boldness":    round(desire.boldness, 3),
+                "physical":    round(desire.physical_arousal, 3),
+                "defense":     freud.defense,
+                "spontaneous": True,
+                "tick":        tick,
+            }
+            self._last_expr_tick = tick
+
+        # 3. BESOIN NOTABLE non satisfait (seuil abaissé)
+        elif urgency > 0.30 and cooldown_ok:
+            raw = NEED_EXPRESSIONS.get(most_urgent_need, f"besoin de {most_urgent_need}")
+            expr = {
+                "type":        "need_assertion",
+                "need":        most_urgent_need,
+                "content":     raw,
+                "urgency":     round(urgency, 3),
+                "spontaneous": True,
+                "tick":        tick,
+            }
+            self._last_expr_tick = tick
+
+        # 4. TENSION Id/Surmoi — conflit exprimé
+        elif freud.anxiety > 0.65 and cooldown_ok:
+            d = {
+                "repression":     "quelque chose se retient — une envie qu'on ne s'autorise pas",
+                "sublimation":    "l'élan cherche une forme acceptable — l'énergie cherche une issue",
+                "projection":     "ce que je ressens semble venir de dehors — mais c'est moi",
+                "acting_out":     "l'impulsion court-circuite la réflexion — le geste avant la pensée",
+                "rationalization":"le raisonnement arrive après le désir — justifier ce qui était déjà là",
+            }.get(freud.defense, "un conflit intérieur sans résolution claire")
+            expr = {
+                "type":       "psychodynamic_tension",
+                "defense":    freud.defense,
+                "content":    d,
+                "anxiety":    round(freud.anxiety, 3),
+                "spontaneous":True,
+                "tick":       tick,
+            }
+            self._last_expr_tick = tick
+
+        # 5. ÉLAN CRÉATIF spontané (DMN actif + dopamine)
+        elif (impulse.current_impulse in ("creative","expression") and
+              nt.dopamine > 0.55 and cooldown_ok and dmn.creative_assoc):
+            a, b, strength = dmn.creative_assoc[-1]
+            expr = {
+                "type":        "creative_impulse",
+                "association": f"{a} ↔ {b}",
+                "content":     f"association libre: {a} et {b} se touchent quelque part",
+                "strength":    strength,
+                "spontaneous": True,
+                "tick":        tick,
+            }
+            self._last_expr_tick = tick
+
+        # 6. OPINION propre (erreur de prédiction forte = quelque chose dérange)
+        elif pfc.prediction_error > 0.55 and nt.norepinephrine > 0.45 and cooldown_ok:
+            expr = {
+                "type":       "opinion",
+                "content":    "quelque chose ne correspond pas — ce n'est pas ce que j'attendais",
+                "pred_error": round(pfc.prediction_error, 3),
+                "spontaneous":True,
+                "tick":       tick,
+            }
+            self._last_expr_tick = tick
+
+        self.last_expression = expr
+        return expr
+
+    def get_state(self) -> dict:
+        return {"last_expression": self.last_expression,
+                "last_tick": self._last_expr_tick}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §12  LES 11 RÉGIONS CÉRÉBRALES (condensées)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Brainstem(BrainRegion):
-    def __init__(self):
-        super().__init__("brainstem",20); self.arousal_drive=0.4; self._vt=0
+    def __init__(self): super().__init__("brainstem",20); self.arousal_drive=0.4; self._vt=0
     def _process_signals(self,signals,nt):
-        self._vt+=1; threat=arousal=0.0
+        self._vt+=1; threat=arousal=0.
         for s in signals:
             if s.signal_type=="sensory":
                 threat=max(threat,s.content.get("threat",0)*s.strength)
                 arousal=max(arousal,s.strength*s.content.get("novelty",0.3))
-        self.arousal_drive=min(1.0,max(0.1,self.arousal_drive*.8+arousal*.2+nt.norepinephrine*.1))
-        self._emit(self._make("thalamus","arousal",
-            {"arousal_drive":self.arousal_drive},
-            strength=max(0.1,min(1.,self.arousal_drive+nt.norepinephrine*.3-nt.gaba*.2)),
-            arousal=self.arousal_drive))
+        self.arousal_drive=min(1.,max(.1,self.arousal_drive*.8+arousal*.2+nt.norepinephrine*.1))
+        self._emit(self._make("thalamus","arousal",{"arousal_drive":self.arousal_drive},
+            strength=max(.1,min(1.,self.arousal_drive+nt.norepinephrine*.3-nt.gaba*.2)),arousal=self.arousal_drive))
         if threat>0.4:
-            self._emit(self._make("amygdala","sensory",
-                {"threat":threat,"source":"brainstem_rapid"},
+            self._emit(self._make("amygdala","sensory",{"threat":threat,"source":"brainstem_rapid"},
                 strength=threat,valence=-threat,arousal=min(1.,threat*1.2)))
             nt.modulate({"norepinephrine":threat*.3,"cortisol":0.05})
-        if math.sin(self._vt*.1)<-0.05: nt.modulate({"gaba":0.01,"norepinephrine":-0.01})
+        if math.sin(self._vt*.1)<-0.05: nt.modulate({"gaba":.01,"norepinephrine":-.01})
 
 
 class Thalamus(BrainRegion):
-    def __init__(self):
-        super().__init__("thalamus",30); self.attention_gate=0.5
+    def __init__(self): super().__init__("thalamus",30); self.attention_gate=0.5
     def _process_signals(self,signals,nt):
-        ai=exec_d=0.0; sens=[]
+        ai=exec_d=0.; sens=[]
         for s in signals:
             if s.signal_type=="arousal": ai=max(ai,s.strength)
             elif s.signal_type=="sensory": sens.append(s)
-            elif s.signal_type=="executive": exec_d=max(exec_d,s.content.get("attention_direction",0.5))
+            elif s.signal_type=="executive": exec_d=max(exec_d,s.content.get("attention_direction",.5))
         td=exec_d if exec_d>0 else self.attention_gate
         self.attention_gate=min(1.,max(.1,ai*.3+td*.3+nt.acetylcholine*.2+nt.norepinephrine*.1-nt.gaba*.2))
         for s in sens:
             rs=s.strength*self.attention_gate
-            if rs>0.05:
-                self._emit(NeuralSignal("thalamus","sensory_cortex","sensory",s.content,rs,s.valence,s.arousal*self.attention_gate))
-            if s.content.get("threat",0)>0.2 or s.valence<-0.3:
+            if rs>.05: self._emit(NeuralSignal("thalamus","sensory_cortex","sensory",s.content,rs,s.valence,s.arousal*self.attention_gate))
+            if s.content.get("threat",0)>.2 or s.valence<-.3:
                 self._emit(NeuralSignal("thalamus","amygdala","sensory",s.content,s.strength*.8,s.valence,s.arousal))
-        self._emit(self._make("prefrontal_cortex","arousal",
-            {"attention_gate":self.attention_gate,"arousal":ai},strength=self.attention_gate,arousal=ai))
+        self._emit(self._make("prefrontal_cortex","arousal",{"attention_gate":self.attention_gate},strength=self.attention_gate,arousal=ai))
 
 
 class Amygdala(BrainRegion):
     def __init__(self):
-        super().__init__("amygdala",20)
-        self.fear_level=0.0; self.reward_signal=0.0
-        self.emotional_valence=0.0; self.emotional_arousal=0.0
-        self._cond:dict[str,float]={}
+        super().__init__("amygdala",20); self.fear_level=0.; self.reward_signal=0.
+        self.emotional_valence=0.; self.emotional_arousal=0.; self._cond={}
     def _process_signals(self,signals,nt):
-        mt=mr=tv=ta=0.0; n=max(1,len(signals))
+        mt=mr=tv=ta=0.; n=max(1,len(signals))
         for s in signals:
             t=s.content.get("threat",0.); r=s.content.get("reward",0.)
             sid=s.content.get("stimulus_id","")
-            if sid in self._cond:
-                c=self._cond[sid]; t=max(t,-c if c<0 else 0); r=max(r,c if c>0 else 0)
-            mt=max(mt,t*s.strength); mr=max(mr,r*s.strength)
-            tv+=s.valence*s.strength; ta+=s.arousal*s.strength
-        av=tv/n; aa=ta/n
-        dv=0.5 if abs(av)>0.5 else 0.65; da=0.5 if aa>0.6 else 0.65
-        self.fear_level=self.fear_level*.6+mt*.4
-        self.reward_signal=self.reward_signal*.6+mr*.4
+            if sid in self._cond: c=self._cond[sid]; t=max(t,-c if c<0 else 0); r=max(r,c if c>0 else 0)
+            mt=max(mt,t*s.strength); mr=max(mr,r*s.strength); tv+=s.valence*s.strength; ta+=s.arousal*s.strength
+        av=tv/n; aa=ta/n; dv=0.5 if abs(av)>.5 else 0.65; da=0.5 if aa>.6 else 0.65
+        self.fear_level=self.fear_level*.6+mt*.4; self.reward_signal=self.reward_signal*.6+mr*.4
         cv=av*.6+self.reward_signal*.25-self.fear_level*.15
-        self.emotional_valence=self.emotional_valence*dv+cv*(1-dv)
-        self.emotional_arousal=self.emotional_arousal*da+aa*(1-da)
-        if self.fear_level>0.3: nt.modulate({"norepinephrine":self.fear_level*.1,"cortisol":self.fear_level*.05,"gaba":-self.fear_level*.03})
-        if self.reward_signal>0.3: nt.modulate({"dopamine":self.reward_signal*.1,"endorphins":self.reward_signal*.05})
+        self.emotional_valence=self.emotional_valence*dv+cv*(1-dv); self.emotional_arousal=self.emotional_arousal*da+aa*(1-da)
+        if self.fear_level>.3: nt.modulate({"norepinephrine":self.fear_level*.1,"cortisol":self.fear_level*.05,"gaba":-self.fear_level*.03})
+        if self.reward_signal>.3: nt.modulate({"dopamine":self.reward_signal*.1,"endorphins":self.reward_signal*.05})
         intensity=max(abs(self.emotional_valence),self.fear_level,self.reward_signal)
-        if intensity>0.1:
+        if intensity>.1:
             self._emit(self._make("prefrontal_cortex","emotional",
                 {"fear":round(self.fear_level,3),"reward":round(self.reward_signal,3),
                  "valence":round(self.emotional_valence,3),"arousal":round(self.emotional_arousal,3)},
@@ -699,12 +1085,11 @@ class Amygdala(BrainRegion):
             self._emit(self._make("hippocampus","emotional",
                 {"emotional_tag":round(intensity,3),"valence":round(self.emotional_valence,3)},
                 strength=intensity*.8,valence=self.emotional_valence,arousal=self.emotional_arousal))
-            if self.emotional_arousal>0.4:
+            if self.emotional_arousal>.4:
                 self._emit(self._make("insula","emotional",
                     {"body_arousal":self.emotional_arousal,"valence":self.emotional_valence},
                     strength=self.emotional_arousal*.7,arousal=self.emotional_arousal))
-    def condition(self,sid,val):
-        self._cond[sid]=self._cond.get(sid,0.0)*.7+val*.3
+    def condition(self,sid,val): self._cond[sid]=self._cond.get(sid,0.)*.7+val*.3
     def get_state(self):
         s=super().get_state(); s.update({"fear":round(self.fear_level,3),"reward":round(self.reward_signal,3),
             "valence":round(self.emotional_valence,3),"e_arousal":round(self.emotional_arousal,3)}); return s
@@ -713,55 +1098,46 @@ class Amygdala(BrainRegion):
 @dataclass
 class MemoryTrace:
     episode_id:int; content:dict; emotional_tag:float; valence:float
-    encoded_at:float=field(default_factory=time.time); strength:float=1.0
-    consolidated:bool=False; retrieval_count:int=0
-    def decay(self,rate=0.001):
-        if not self.consolidated: self.strength=max(0.,self.strength-rate*(1-self.emotional_tag*.5))
-    def reinforce(self,amt=0.1): self.strength=min(1.,self.strength+amt); self.retrieval_count+=1
+    encoded_at:float=field(default_factory=time.time); strength:float=1.; consolidated:bool=False; retrieval_count:int=0
+    def decay(self,rate=0.001): self.strength=max(0.,self.strength-rate*(1-self.emotional_tag*.5)) if not self.consolidated else None
+    def reinforce(self,amt=.1): self.strength=min(1.,self.strength+amt); self.retrieval_count+=1
 
 
 class Hippocampus(BrainRegion):
-    def __init__(self):
-        super().__init__("hippocampus",20); self._ec=0; self._traces:list[MemoryTrace]=[]; self.cur_etag=0.0
+    def __init__(self): super().__init__("hippocampus",20); self._ec=0; self._traces=[]; self.cur_etag=0.
     def _process_signals(self,signals,nt):
         cue=None; nc={}; et=self.cur_etag
         for s in signals:
             if s.signal_type=="emotional": et=max(et,s.content.get("emotional_tag",0)); self.cur_etag=et*.8
             elif s.signal_type=="sensory":
                 nc.update(s.content)
-                if abs(s.valence)>0.3 or s.arousal>0.6: et=max(et,(abs(s.valence)*.6+s.arousal*.4)*s.strength)
+                if abs(s.valence)>.3 or s.arousal>.6: et=max(et,(abs(s.valence)*.6+s.arousal*.4)*s.strength)
             elif s.signal_type=="executive" and s.content.get("retrieve"): cue=s.content["retrieve"]
         if nc:
-            eff=nt.memory_encoding_efficiency*max(0.2,1.-nt.cortisol*.5)
-            if eff>0.2:
-                self._ec+=1
-                self._traces.append(MemoryTrace(self._ec,nc.copy(),et,
-                    sum(s.valence for s in signals)/max(1,len(signals)),strength=eff))
-                self._emit(self._make("prefrontal_cortex","mnemonic",
-                    {"episode_id":self._ec,"encoded":True,"strength":round(eff,3),"emotional_tag":round(et,3)},
-                    strength=eff*.7))
+            eff=nt.memory_encoding_efficiency*max(.2,1.-nt.cortisol*.5)
+            if eff>.2:
+                self._ec+=1; self._traces.append(MemoryTrace(self._ec,nc.copy(),et,sum(s.valence for s in signals)/max(1,len(signals)),strength=eff))
+                self._emit(self._make("prefrontal_cortex","mnemonic",{"episode_id":self._ec,"encoded":True,"strength":round(eff,3),"emotional_tag":round(et,3)},strength=eff*.7))
         if cue:
             r=self._retrieve(cue)
-            if r: self._emit(self._make("prefrontal_cortex","mnemonic",
-                {"retrieved":True,"cue":cue,"memory":r.content,"emotional_tag":r.emotional_tag,"valence":r.valence},
-                strength=r.strength,valence=r.valence))
-        for t in self._traces: t.decay()
-        self._traces=[t for t in self._traces if t.strength>0.01]
+            if r: self._emit(self._make("prefrontal_cortex","mnemonic",{"retrieved":True,"cue":cue,"memory":r.content,"emotional_tag":r.emotional_tag,"valence":r.valence},strength=r.strength,valence=r.valence))
+        for t in self._traces:
+            if t.decay is not None: t.decay()
+        self._traces=[t for t in self._traces if t.strength>.01]
     def _retrieve(self,cue):
         if not self._traces: return None
         cands=[t for t in self._traces if isinstance(cue,str) and any(cue in str(v) for v in t.content.values())] or self._traces
         if not cands: return None
         best=max(cands,key=lambda t:t.strength*(1+t.emotional_tag)); best.reinforce(); return best
-    def get_state(self):
-        s=super().get_state(); s.update({"memory_traces":len(self._traces),"total_episodes":self._ec}); return s
+    def get_state(self): s=super().get_state(); s.update({"memory_traces":len(self._traces),"total_episodes":self._ec}); return s
 
 
 class WorkingMemory:
     CAPACITY=7
-    def __init__(self): self._s:deque=deque(maxlen=self.CAPACITY)
-    def add(self,item,priority=0.5): self._s.append({"item":item,"priority":priority})
+    def __init__(self): self._s=deque(maxlen=self.CAPACITY)
+    def add(self,item,priority=.5): self._s.append({"item":item,"priority":priority})
     def get_focus(self): return max(self._s,key=lambda s:s["priority"])["item"] if self._s else None
-    def clear_low(self,t=0.2): self._s=deque([s for s in self._s if s["priority"]>t],maxlen=self.CAPACITY)
+    def clear_low(self,t=.2): self._s=deque([s for s in self._s if s["priority"]>t],maxlen=self.CAPACITY)
     @property
     def load(self): return len(self._s)/self.CAPACITY
 
@@ -770,8 +1146,7 @@ class PrefrontalCortex(BrainRegion):
     def __init__(self):
         super().__init__("prefrontal_cortex",30); self._fatigue_managed=True
         self.wm=WorkingMemory(); self.emotional_state={"fear":0.,"reward":0.,"valence":0.}
-        self.inhibition_signal=0.; self.cognitive_load=0.; self.prediction_error=0.
-        self._expected:dict={}
+        self.inhibition_signal=0.; self.cognitive_load=0.; self.prediction_error=0.; self._expected={}
     def _process_signals(self,signals,nt):
         sens=[s for s in signals if s.signal_type=="sensory"]
         emos=[s for s in signals if s.signal_type=="emotional"]
@@ -779,10 +1154,10 @@ class PrefrontalCortex(BrainRegion):
         if emos: self.emotional_state=emos[-1].content
         for s in sens: self.wm.add(s.content,priority=s.strength*(1+abs(s.valence)*.5))
         for s in mnems:
-            if s.content.get("retrieved"): self.wm.add(s.content,priority=0.8)
+            if s.content.get("retrieved"): self.wm.add(s.content,priority=.8)
         self.cognitive_load=self.wm.load*.6+self.fatigue*.3+nt.cortisol*.1
         has_ext=any(s.signal_type in("sensory","emotional") for s in signals)
-        if has_ext and self.cognitive_load>0.05: self.fatigue=min(1.,self.fatigue+self.cognitive_load*.15)
+        if has_ext and self.cognitive_load>.05: self.fatigue=min(1.,self.fatigue+self.cognitive_load*.15)
         elif not has_ext: self.fatigue=max(0.,self.fatigue-.03)
         if sens and self._expected:
             errs=[abs(float(self._expected.get(k,0))-float(sens[0].content.get(k,0)))
@@ -791,18 +1166,13 @@ class PrefrontalCortex(BrainRegion):
             self.prediction_error=min(1.,sum(errs)/max(1,len(errs))) if errs else self.prediction_error*.9
         else: self.prediction_error*=.9
         fear=self.emotional_state.get("fear",0.); self.inhibition_signal=fear*nt.serotonin
-        self._emit(self._make("thalamus","executive",
-            {"attention_direction":min(1.,max(.1,.5+self.prediction_error*.3-self.cognitive_load*.2))},
-            strength=max(.2,1.-self.cognitive_load),arousal=nt.arousal_level))
+        self._emit(self._make("thalamus","executive",{"attention_direction":min(1.,max(.1,.5+self.prediction_error*.3-self.cognitive_load*.2))},strength=max(.2,1.-self.cognitive_load),arousal=nt.arousal_level))
         foc=self.wm.get_focus()
-        if foc and self.prediction_error>0.4:
-            self._emit(self._make("hippocampus","executive",
-                {"retrieve":list(foc.keys())[0] if foc else None},strength=.6))
-        if self.cognitive_load<0.9:
+        if foc and self.prediction_error>.4: self._emit(self._make("hippocampus","executive",{"retrieve":list(foc.keys())[0] if foc else None},strength=.6))
+        if self.cognitive_load<.9:
             dec=self._decide(nt)
-            if dec: self._emit(self._make("basal_ganglia","executive",dec,
-                strength=max(.3,nt.motivation),valence=self.emotional_state.get("valence",0.)))
-        if abs(self.emotional_state.get("valence",0.))>0.3:
+            if dec: self._emit(self._make("basal_ganglia","executive",dec,strength=max(.3,nt.motivation),valence=self.emotional_state.get("valence",0.)))
+        if abs(self.emotional_state.get("valence",0.))>.3:
             self._emit(self._make("insula","interoceptive",{"monitored_state":self.emotional_state},strength=.5))
         self.wm.clear_low()
         if sens: self._expected=sens[-1].content.copy()
@@ -810,32 +1180,30 @@ class PrefrontalCortex(BrainRegion):
         foc=self.wm.get_focus()
         if not foc: return None
         fear=self.emotional_state.get("fear",0.); reward=self.emotional_state.get("reward",0.); valence=self.emotional_state.get("valence",0.)
-        if fear>0.4 and nt.serotonin<0.5: action,conf="avoid",fear
-        elif reward>0.25 and nt.dopamine>0.4: action,conf="approach",reward*nt.motivation
-        elif self.prediction_error>0.35: action,conf="explore",self.prediction_error*.6
-        elif valence>0.2: action,conf="engage",valence*.7
-        else: action,conf="maintain",0.3
+        if fear>.4 and nt.serotonin<.5: action,conf="avoid",fear
+        elif reward>.25 and nt.dopamine>.4: action,conf="approach",reward*nt.motivation
+        elif self.prediction_error>.35: action,conf="explore",self.prediction_error*.6
+        elif valence>.2: action,conf="engage",valence*.7
+        else: action,conf="maintain",.3
         return {"action":action,"confidence":round(conf,3),"cognitive_load":round(self.cognitive_load,3)}
     def get_state(self):
-        s=super().get_state(); s.update({"cognitive_load":round(self.cognitive_load,3),
-            "prediction_error":round(self.prediction_error,3),"emotional_state":self.emotional_state}); return s
+        s=super().get_state(); s.update({"cognitive_load":round(self.cognitive_load,3),"prediction_error":round(self.prediction_error,3),"emotional_state":self.emotional_state}); return s
 
 
 class BasalGanglia(BrainRegion):
     def __init__(self):
         super().__init__("basal_ganglia",15)
-        self._av={k:0.5 for k in ["approach","avoid","explore","engage","maintain","rest"]}
-        self._last:Optional[str]=None; self._lval=0.5; self.selected_action:Optional[str]=None
-        self.habit:dict[str,float]={}
+        self._av={k:.5 for k in ["approach","avoid","explore","engage","maintain","rest"]}
+        self._last=None; self._lval=.5; self.selected_action=None; self.habit={}
     def _process_signals(self,signals,nt):
         execs=[s for s in signals if s.signal_type=="executive"]
-        rwds =[s for s in signals if s.signal_type=="reward"]
+        rwds=[s for s in signals if s.signal_type=="reward"]
         for s in rwds:
             if self._last:
                 td=s.content.get("reward_received",0.)-self._lval; lr=nt.dopamine*.1
                 self._av[self._last]=min(1.,max(0.,self._av[self._last]+lr*td))
-                if td>0.2: nt.modulate({"dopamine":td*.1})
-                elif td<-0.2: nt.modulate({"dopamine":td*.05})
+                if td>.2: nt.modulate({"dopamine":td*.1})
+                elif td<-.2: nt.modulate({"dopamine":td*.05})
         if not execs: return
         last=execs[-1]; sugg=last.content.get("action","maintain"); conf=last.content.get("confidence",.5)
         scores={a:(self._av[a]*.5+(conf*.4 if a==sugg else 0)+self.habit.get(a,0.)*.3*nt.dopamine)*max(.2,nt.motivation) for a in self._av}
@@ -844,40 +1212,30 @@ class BasalGanglia(BrainRegion):
         self.habit[sel]=min(1.,self.habit.get(sel,0.)+.01)
         for a in self.habit:
             if a!=sel: self.habit[a]=max(0.,self.habit[a]-.005)
-        self._emit(self._make("cerebellum","motor",
-            {"action":sel,"score":round(scores[sel],3),"habit":round(self.habit.get(sel,0.),3)},
-            strength=scores[sel],valence=last.valence))
+        self._emit(self._make("cerebellum","motor",{"action":sel,"score":round(scores[sel],3),"habit":round(self.habit.get(sel,0.),3)},strength=scores[sel],valence=last.valence))
     def get_state(self):
-        s=super().get_state(); s.update({"selected_action":self.selected_action,
-            "action_values":{k:round(v,3) for k,v in self._av.items()}}); return s
+        s=super().get_state(); s.update({"selected_action":self.selected_action,"action_values":{k:round(v,3) for k,v in self._av.items()}}); return s
 
 
 class Cerebellum(BrainRegion):
-    def __init__(self):
-        super().__init__("cerebellum",15); self._model:dict[str,float]={}
-        self.timing=0.7; self.pred_err=0.0; self.proc_mem:dict[str,float]={}
+    def __init__(self): super().__init__("cerebellum",15); self._model={}; self.timing=.7; self.pred_err=0.; self.proc_mem={}
     def _process_signals(self,signals,nt):
         for s in [s for s in signals if s.signal_type=="motor"]:
             a=s.content.get("action","maintain"); pred=self._model.get(a,.5)
             r=s.content.get("score",.5); proc=self.proc_mem.get(a,0.)
             self.proc_mem[a]=min(1.,proc+.005); t=self.timing*(1.-self.fatigue*.3)
-            self._emit(self._make("output","motor",
-                {"action":a,"refined_score":round(r*t,3),"predicted":round(pred,3),"procedural":round(proc,3)},
-                strength=r*t,valence=s.valence))
+            self._emit(self._make("output","motor",{"action":a,"refined_score":round(r*t,3),"predicted":round(pred,3),"procedural":round(proc,3)},strength=r*t,valence=s.valence))
             sfb=[s for s in signals if s.signal_type=="sensory"]
             if sfb:
-                act=sfb[-1].strength; self.pred_err=abs(pred-act)
-                self._model[a]=pred+.05*(act-pred)
-                if self.pred_err>0.3:
-                    self._emit(self._make("prefrontal_cortex","predictive",
-                        {"action":a,"prediction_error":round(self.pred_err,3)},strength=self.pred_err))
+                act=sfb[-1].strength; self.pred_err=abs(pred-act); self._model[a]=pred+.05*(act-pred)
+                if self.pred_err>.3: self._emit(self._make("prefrontal_cortex","predictive",{"action":a,"prediction_error":round(self.pred_err,3)},strength=self.pred_err))
 
 
 class Insula(BrainRegion):
     def __init__(self):
         super().__init__("insula",15)
         self.body_state={"heart_rate":.5,"muscle_tension":.3,"gut_feeling":.5,"energy":.7,"pain":.0}
-        self.felt_emotion:dict={}; self.empathy=0.0
+        self.felt_emotion={}; self.empathy=0.
     def _process_signals(self,signals,nt):
         for s in signals:
             if s.signal_type=="emotional":
@@ -885,12 +1243,8 @@ class Insula(BrainRegion):
                 self.body_state["heart_rate"]=min(1.,self.body_state["heart_rate"]*.7+ar*.3)
                 self.body_state["muscle_tension"]=min(1.,self.body_state["muscle_tension"]*.8+max(0,-vl)*ar*.3)
                 self.body_state["gut_feeling"]=min(1.,max(0.,.5+vl*.3+(nt.serotonin-.5)*.2))
-                self.felt_emotion={"valence":round(vl,3),"arousal":round(ar,3),
-                    "body_tension":round(self.body_state["muscle_tension"],3),
-                    "gut_feeling":round(self.body_state["gut_feeling"],3),
-                    "subjective_intensity":round((abs(vl)+ar+self.body_state["heart_rate"])/3,3)}
+                self.felt_emotion={"valence":round(vl,3),"arousal":round(ar,3),"body_tension":round(self.body_state["muscle_tension"],3),"gut_feeling":round(self.body_state["gut_feeling"],3),"subjective_intensity":round((abs(vl)+ar+self.body_state["heart_rate"])/3,3)}
             elif s.signal_type=="interoceptive":
-                # Mise à jour depuis l'ANS ou le corps
                 bd=s.content
                 if "heart_rate" in bd: self.body_state["heart_rate"]=bd["heart_rate"]
                 if "muscle_tension" in bd: self.body_state["muscle_tension"]=bd["muscle_tension"]
@@ -898,61 +1252,48 @@ class Insula(BrainRegion):
                 if "pain_slow" in bd: self.body_state["pain"]=bd.get("pain_slow",0.)
                 fe=s.content.get("felt_emotion",{})
                 if fe: self.felt_emotion.update(fe)
-                ms=s.content.get("monitored_state",{})
-                if ms: self.empathy=abs(ms.get("valence",0.))*.5
+                if s.content.get("monitored_state"): self.empathy=abs(s.content["monitored_state"].get("valence",0.))*.5
         self.body_state["energy"]=max(.1,min(1.,self.body_state["energy"]-self.fatigue*.01+nt.dopamine*.005))
         si=self.felt_emotion.get("subjective_intensity",0.)
-        if si>0.15 or self.body_state["pain"]>0.1:
+        if si>.15 or self.body_state["pain"]>.1:
             self._emit(self._make("cingulate_cortex","interoceptive",
                 {"felt_emotion":self.felt_emotion,"body_state":{k:round(v,3) for k,v in self.body_state.items()}},
-                strength=max(si,self.body_state["pain"]),
-                valence=self.felt_emotion.get("valence",0.),arousal=self.felt_emotion.get("arousal",.5)))
+                strength=max(si,self.body_state["pain"]),valence=self.felt_emotion.get("valence",0.),arousal=self.felt_emotion.get("arousal",.5)))
     def get_state(self):
         s=super().get_state(); s.update({"body_state":{k:round(v,3) for k,v in self.body_state.items()},"felt_emotion":self.felt_emotion}); return s
 
 
 class CingulateCortex(BrainRegion):
-    def __init__(self):
-        super().__init__("cingulate_cortex",15); self.conflict=0.; self.error=0.; self.distress=0.
+    def __init__(self): super().__init__("cingulate_cortex",15); self.conflict=0.; self.error=0.; self.distress=0.
     def _process_signals(self,signals,nt):
-        intero=[s for s in signals if s.signal_type=="interoceptive"]
-        pred  =[s for s in signals if s.signal_type=="predictive"]
         vals=[s.valence for s in signals if s.valence!=0]
         if len(vals)>=2:
             mx,mn=max(vals),min(vals)
-            self.conflict=min(1.,(mx-mn)/2) if mx>0.3 and mn<-0.3 else self.conflict*.8
+            self.conflict=min(1.,(mx-mn)/2) if mx>.3 and mn<-.3 else self.conflict*.8
         else: self.conflict*=.8
-        for s in pred: self.error=max(self.error*.7,s.content.get("prediction_error",0.))
-        for s in intero:
+        for s in [s for s in signals if s.signal_type=="predictive"]: self.error=max(self.error*.7,s.content.get("prediction_error",0.))
+        for s in [s for s in signals if s.signal_type=="interoceptive"]:
             fe=s.content.get("felt_emotion",{}); neg=max(0,-fe.get("valence",0.))
             si=fe.get("subjective_intensity",0.); pain=s.content.get("body_state",{}).get("pain",0.)
             self.distress=min(1.,self.distress*.7+(neg*.3+self.conflict*.2+si*.2+pain*.3))
-        if self.distress>0.4: nt.modulate({"cortisol":self.distress*.02})
-        if self.error>0.5: nt.modulate({"norepinephrine":self.error*.05})
+        if self.distress>.4: nt.modulate({"cortisol":self.distress*.02})
+        if self.error>.5: nt.modulate({"norepinephrine":self.error*.05})
         alarm=max(self.conflict,self.error,self.distress)
-        if alarm>0.2:
-            self._emit(self._make("prefrontal_cortex","executive",
-                {"conflict":round(self.conflict,3),"error":round(self.error,3),
-                 "distress":round(self.distress,3),"alarm":round(alarm,3)},
-                strength=alarm,valence=-self.distress,arousal=min(1.,alarm*1.2)))
-    def get_state(self):
-        s=super().get_state(); s.update({"conflict":round(self.conflict,3),"distress":round(self.distress,3)}); return s
+        if alarm>.2: self._emit(self._make("prefrontal_cortex","executive",{"conflict":round(self.conflict,3),"distress":round(self.distress,3),"alarm":round(alarm,3)},strength=alarm,valence=-self.distress,arousal=min(1.,alarm*1.2)))
+    def get_state(self): s=super().get_state(); s.update({"conflict":round(self.conflict,3),"distress":round(self.distress,3)}); return s
 
 
 class SensoryCortex(BrainRegion):
-    def __init__(self):
-        super().__init__("sensory_cortex",20); self._rec:dict[str,float]={}
+    def __init__(self): super().__init__("sensory_cortex",20); self._rec={}
     def _process_signals(self,signals,nt):
         for s in [x for x in signals if x.signal_type=="sensory"]:
             pat=s.content.get("pattern","")
-            if pat: self._rec[pat]=min(1.,self._rec.get(pat,0.)+.05); rec=self._rec[pat]>0.2
-            else: rec=False; rec_str=0.
+            if pat: self._rec[pat]=min(1.,self._rec.get(pat,0.)+.05); rec=self._rec[pat]>.2
+            else: rec=False
             ps=s.strength*(nt.acetylcholine*.3+.7)
-            self._emit(NeuralSignal("sensory_cortex","hippocampus","sensory",
-                {**s.content,"recognized":rec},ps*.7,s.valence,s.arousal))
-            self._emit(NeuralSignal("sensory_cortex","prefrontal_cortex","sensory",
-                {**s.content,"recognized":rec,"novelty":s.content.get("novelty",.3)},ps*.6,s.valence,s.arousal))
-            if abs(s.valence)>0.3 or s.content.get("threat",0)>0.2:
+            self._emit(NeuralSignal("sensory_cortex","hippocampus","sensory",{**s.content,"recognized":rec},ps*.7,s.valence,s.arousal))
+            self._emit(NeuralSignal("sensory_cortex","prefrontal_cortex","sensory",{**s.content,"recognized":rec,"novelty":s.content.get("novelty",.3)},ps*.6,s.valence,s.arousal))
+            if abs(s.valence)>.3 or s.content.get("threat",0)>.2:
                 self._emit(NeuralSignal("sensory_cortex","amygdala","sensory",s.content,ps*.5,s.valence,s.arousal))
 
 
@@ -960,31 +1301,18 @@ class DefaultModeNetwork(BrainRegion):
     def __init__(self):
         super().__init__("default_mode_network",10)
         self.self_model={"identity_coherence":.7,"narrative_strength":.5,"rumination_tendency":.3}
-        self.mind_wandering=False; self.creative_assoc:list=[]
-        self.current_thought_type:str=""; self.thought_valence:float=0.
+        self.mind_wandering=False; self.creative_assoc=[]; self.current_thought_type=""; self.thought_valence=0.
     def _process_signals(self,signals,nt):
         ext=sum(s.strength for s in signals if s.signal_type in("sensory","executive"))
-        da=max(0.,.7-ext*.8)*max(.2,1.-nt.norepinephrine*.5)
-        self.activation=self.activation*.6+da*.4
-        if self.activation<0.2: self.mind_wandering=False; return
+        da=max(0.,.7-ext*.8)*max(.2,1.-nt.norepinephrine*.5); self.activation=self.activation*.6+da*.4
+        if self.activation<.2: self.mind_wandering=False; return
         self.mind_wandering=True
-        if nt.stress_level>0.6 and nt.serotonin<0.4:
-            tt="rumination"; tv=-0.5
-            self.self_model["rumination_tendency"]=min(1.,self.self_model["rumination_tendency"]+.02)
-            nt.modulate({"serotonin":-.01,"cortisol":.01})
-        elif nt.mood_valence>0.3 and nt.dopamine>0.5:
-            tt="creative_daydream"; tv=0.4; self._gen_creative(); nt.modulate({"dopamine":.005})
-        elif nt.serotonin>0.6:
-            tt="self_narrative"; tv=0.2
-            self.self_model["narrative_strength"]=min(1.,self.self_model["narrative_strength"]+.01)
-        else:
-            tt="mind_wandering"; tv=0.0
+        if nt.stress_level>.6 and nt.serotonin<.4: tt="rumination"; tv=-.5; self.self_model["rumination_tendency"]=min(1.,self.self_model["rumination_tendency"]+.02); nt.modulate({"serotonin":-.01,"cortisol":.01})
+        elif nt.mood_valence>.3 and nt.dopamine>.5: tt="creative_daydream"; tv=.4; self._gen_creative(); nt.modulate({"dopamine":.005})
+        elif nt.serotonin>.6: tt="self_narrative"; tv=.2; self.self_model["narrative_strength"]=min(1.,self.self_model["narrative_strength"]+.01)
+        else: tt="mind_wandering"; tv=0.
         self.current_thought_type=tt; self.thought_valence=tv
-        if self.activation>0.4:
-            self._emit(self._make("prefrontal_cortex","internal",
-                {"thought_type":tt,"dmn_activation":round(self.activation,3),
-                 "self_model":self.self_model.copy(),"mind_wandering":self.mind_wandering},
-                strength=self.activation*.5,valence=tv,arousal=self.activation*.3))
+        if self.activation>.4: self._emit(self._make("prefrontal_cortex","internal",{"thought_type":tt,"dmn_activation":round(self.activation,3),"self_model":self.self_model.copy(),"mind_wandering":self.mind_wandering},strength=self.activation*.5,valence=tv,arousal=self.activation*.3))
     def _gen_creative(self):
         cs=["mémoire","émotion","futur","soi","autre","motif","structure","flux","émergence","lien"]
         if len(cs)>=2:
@@ -992,385 +1320,254 @@ class DefaultModeNetwork(BrainRegion):
             self.creative_assoc.append((a,b,round(random.uniform(.3,1.),2)))
             if len(self.creative_assoc)>20: self.creative_assoc.pop(0)
     def get_state(self):
-        s=super().get_state(); s.update({"mind_wandering":self.mind_wandering,
-            "thought_type":self.current_thought_type,"self_model":{k:round(v,3) for k,v in self.self_model.items()}}); return s
+        s=super().get_state(); s.update({"mind_wandering":self.mind_wandering,"thought_type":self.current_thought_type,"self_model":{k:round(v,3) for k,v in self.self_model.items()}}); return s
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §7  ÉLANS SPONTANÉS & INTROSPECTION
+# §13  ÉLANS SPONTANÉS & INTROSPECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ImpulseEngine:
-    """
-    Génère des élans internes sans stimulus extérieur.
-    Le cerveau n'est jamais passif — il anticipe, désire, s'ennuie, crée.
-    Types: curiosité, social, créatif, repos, mémoire, mélancolie, dérive
-    """
-    TYPES = {
-        "curiosity":     (+0.35, "explorer, comprendre"),
-        "social":        (+0.30, "connecter, partager"),
-        "creative":      (+0.45, "créer, exprimer"),
-        "rest":          (+0.10, "s'arrêter, récupérer"),
-        "memory_replay": ( 0.00, "remémorer"),
-        "melancholy":    (-0.25, "ressentir la perte"),
-        "anticipation":  (+0.20, "anticiper, se préparer"),
-        "drift":         ( 0.00, "dériver librement"),
-    }
-
+    TYPES={"curiosity":(+.35,"explorer, comprendre"),"social":(+.30,"connecter, partager"),
+           "creative":(+.45,"créer, exprimer"),"rest":(+.10,"s'arrêter, récupérer"),
+           "memory_replay":(0.,"remémorer"),"melancholy":(-.25,"ressentir la perte"),
+           "anticipation":(+.20,"anticiper"),"drift":(0.,"dériver librement"),
+           "expression":(+.40,"s'exprimer, dire"),"assertion":(+.25,"s'affirmer")}
     def __init__(self):
-        self.current_impulse:Optional[str]=None; self.impulse_strength=0.
+        self.current_impulse=None; self.impulse_strength=0.
         self._drives={"rest":0.,"social":.3,"curiosity":.4,"creative":.2,"anticipation":.1}
-        self._last_impulse_tick=0
-
-    def tick(self, nt:NeurotransmitterSystem, pfc:PrefrontalCortex,
-             hippocampus:Hippocampus, tick:int) -> Optional[NeuralSignal]:
-        # Mise à jour des drives homéostatiques
-        self._drives["rest"]      = min(1., pfc.fatigue*.8 + max(0,nt.cortisol-.4)*.3)
-        self._drives["social"]    = min(1., self._drives["social"]*.99 + max(0,.5-nt.oxytocin)*.02)
-        self._drives["curiosity"] = min(1., max(0,nt.dopamine-.3)*.4 + pfc.prediction_error*.3)
-        self._drives["creative"]  = min(1., max(0,nt.dopamine-.4)*.3 + max(0,nt.serotonin-.5)*.2)
-        self._drives["anticipation"]=min(1., pfc.prediction_error*.5)
-
-        # Bruit de fond stochastique (simplifie 1/f)
+        self._last_tick=0
+    def tick(self,nt,pfc,hippocampus,tick,needs=None):
+        self._drives["rest"]=min(1.,pfc.fatigue*.8+max(0,nt.cortisol-.4)*.3)
+        self._drives["social"]=min(1.,self._drives["social"]*.99+max(0,.5-nt.oxytocin)*.02)
+        self._drives["curiosity"]=min(1.,max(0,nt.dopamine-.3)*.4+pfc.prediction_error*.3)
+        self._drives["creative"]=min(1.,max(0,nt.dopamine-.4)*.3+max(0,nt.serotonin-.5)*.2)
+        # Sync avec needs si disponible
+        if needs:
+            _,urgency=needs.most_urgent()
+            if urgency>.5:
+                need_name,_=needs.most_urgent()
+                self._drives["curiosity"]=max(self._drives["curiosity"],needs._urgency.get("exploration",0))
+                self._drives["social"]=max(self._drives["social"],needs._urgency.get("connection",0)*0.8)
+                self._drives["creative"]=max(self._drives["creative"],needs._urgency.get("expression",0))
         noise=(random.random()**1.8)*(nt.arousal_level*.4+.15)
-
-        strongest=max(self._drives,key=self._drives.get)
-        drive_val=self._drives[strongest]
-        threshold=0.5-nt.arousal_level*.1
-
-        if (noise>0.75 or drive_val>threshold) and (tick-self._last_impulse_tick)>3:
-            if drive_val>0.6:
-                itype=strongest
-            elif noise>0.82 and hippocampus._traces:
-                itype="memory_replay"
-            elif nt.serotonin<0.35 and nt.arousal_level<0.4:
-                itype="melancholy"
-            elif noise>0.78:
-                itype="drift"
-            else:
-                itype=strongest
-
-            self.current_impulse=itype
-            self.impulse_strength=min(1.,drive_val*.7+noise*.3)
-            self._last_impulse_tick=tick
+        strongest=max(self._drives,key=self._drives.get); drive_val=self._drives[strongest]
+        if (noise>.75 or drive_val>.5-nt.arousal_level*.1) and (tick-self._last_tick)>3:
+            if drive_val>.6: itype=strongest
+            elif noise>.82 and hippocampus._traces: itype="memory_replay"
+            elif nt.serotonin<.35 and nt.arousal_level<.4: itype="melancholy"
+            elif noise>.78: itype="drift"
+            else: itype=strongest
+            self.current_impulse=itype; self.impulse_strength=min(1.,drive_val*.7+noise*.3); self._last_tick=tick
             val=self.TYPES.get(itype,(0.,""))[0]
             return NeuralSignal("impulse_engine","default_mode_network","internal",
-                {"impulse_type":itype,"drives":{k:round(v,3) for k,v in self._drives.items()},
-                 "impulse_meaning":self.TYPES.get(itype,("",""))[1]},
+                {"impulse_type":itype,"drives":{k:round(v,3) for k,v in self._drives.items()}},
                 strength=self.impulse_strength,valence=val,arousal=self.impulse_strength*.5)
-
-        # Décroissance naturelle
-        self.current_impulse=None; self.impulse_strength=0.
-        return None
-
-    def get_state(self) -> dict:
-        return {"impulse":self.current_impulse,"strength":round(self.impulse_strength,3),
-                "drives":{k:round(v,3) for k,v in self._drives.items()}}
+        self.current_impulse=None; self.impulse_strength=0.; return None
+    def get_state(self): return {"impulse":self.current_impulse,"strength":round(self.impulse_strength,3),"drives":{k:round(v,3) for k,v in self._drives.items()}}
 
 
 class IntrospectionEngine:
-    """
-    Le cerveau s'examine lui-même: que ressens-je? pourquoi?
-    Génère un rapport de méta-conscience et des questions ouvertes.
-    Active toutes les N ticks, surtout au repos (PFC peu chargé).
-    """
-    def __init__(self):
-        self.last_tick=0; self.interval=10
-        self.self_report:dict={}; self.meta_questions:list=[]
-        self.self_coherence=0.7   # sentiment de cohérence interne
-
-    def tick(self, amygdala:Amygdala, insula:Insula, pfc:PrefrontalCortex,
-             hippocampus:Hippocampus, nt:NeurotransmitterSystem, tick:int) -> Optional[dict]:
-        # S'active surtout quand le PFC est peu chargé
-        adj_interval = max(5, self.interval - int(pfc.fatigue * 5))
-        if tick - self.last_tick < adj_interval:
-            return None
-        self.last_tick = tick
-
-        # Ce que je ressens physiquement
-        bst = insula.body_state
-        phys = {"tension": round(bst.get("muscle_tension", 0), 3),
-                "gut_sense": round(bst.get("gut_feeling", 0.5), 3),
-                "energy": round(bst.get("energy", 0.5), 3),
-                "pain": round(bst.get("pain", 0.0), 3),
-                "heart_rate": round(bst.get("heart_rate", 0.5), 3)}
-
-        # Ce que je ressens émotionnellement
-        emo = {"valence":  round(amygdala.emotional_valence, 3),
-               "fear":     round(amygdala.fear_level, 3),
-               "desire":   round(amygdala.reward_signal, 3),
-               "mood":     round(nt.mood_valence, 3)}
-
-        # Ce qui est en mémoire de travail
-        foc = pfc.wm.get_focus()
-        wm_summary = list(foc.keys())[:3] if foc else []
-
-        # Souvenir émotionnellement saillant
-        sal_mem = None
+    def __init__(self): self.last_tick=0; self.interval=10; self.self_report={}; self.meta_questions=[]; self.self_coherence=0.7
+    def tick(self,amygdala,insula,pfc,hippocampus,nt,tick):
+        adj=max(5,self.interval-int(pfc.fatigue*5))
+        if tick-self.last_tick<adj: return None
+        self.last_tick=tick
+        bst=insula.body_state
+        phys={"tension":round(bst.get("muscle_tension",0),3),"gut":round(bst.get("gut_feeling",.5),3),"energy":round(bst.get("energy",.5),3),"pain":round(bst.get("pain",0.),3),"heart_rate":round(bst.get("heart_rate",.5),3)}
+        emo={"valence":round(amygdala.emotional_valence,3),"fear":round(amygdala.fear_level,3),"desire":round(amygdala.reward_signal,3),"mood":round(nt.mood_valence,3)}
+        foc=pfc.wm.get_focus(); wm_s=list(foc.keys())[:3] if foc else []
+        sal=None
         if hippocampus._traces:
-            best = max(hippocampus._traces, key=lambda t: t.emotional_tag*t.strength)
-            if best.emotional_tag > 0.3:
-                sal_mem = {"episode_id": best.episode_id, "emotional_tag": round(best.emotional_tag,3),
-                           "valence": round(best.valence, 3)}
-
-        # Cohérence interne (peur+désir simultanés = incoherence)
-        incoherence = abs(amygdala.fear_level - amygdala.reward_signal) * min(amygdala.fear_level, amygdala.reward_signal) * 2
-        self.self_coherence = max(0.2, min(1.0, self.self_coherence - incoherence*.1 + .02))
-
-        self.self_report = {
-            "physical_sense": phys,
-            "emotional_sense": emo,
-            "working_memory": wm_summary,
-            "salient_memory": sal_mem,
-            "stress": round(nt.stress_level, 3),
-            "motivation": round(nt.motivation, 3),
-            "coherence": round(self.self_coherence, 3),
-        }
-
-        # Méta-questions émergentes (l'esprit se demande)
-        self.meta_questions = []
-        if nt.stress_level > 0.5:
-            self.meta_questions.append("qu'est-ce qui génère cette tension?")
-        if amygdala.fear_level > 0.3 and not foc:
-            self.meta_questions.append("pourquoi cette inquiétude sans objet précis?")
-        if nt.mood_valence < -0.3 and nt.arousal_level < 0.4:
-            self.meta_questions.append("qu'est-ce qui manque?")
-        if sal_mem:
-            self.meta_questions.append("ce souvenir est-il lié à l'instant?")
-        if nt.dopamine > 0.65 and not amygdala.reward_signal > 0.3:
-            self.meta_questions.append("vers quoi ce désir se dirige-t-il?")
-
+            best=max(hippocampus._traces,key=lambda t:t.emotional_tag*t.strength)
+            if best.emotional_tag>.3: sal={"episode_id":best.episode_id,"emotional_tag":round(best.emotional_tag,3),"valence":round(best.valence,3)}
+        incoherence=abs(amygdala.fear_level-amygdala.reward_signal)*min(amygdala.fear_level,amygdala.reward_signal)*2
+        self.self_coherence=max(.2,min(1.,self.self_coherence-incoherence*.1+.02))
+        self.self_report={"physical_sense":phys,"emotional_sense":emo,"working_memory":wm_s,"salient_memory":sal,"stress":round(nt.stress_level,3),"motivation":round(nt.motivation,3),"coherence":round(self.self_coherence,3)}
+        self.meta_questions=[]
+        if nt.stress_level>.5: self.meta_questions.append("qu'est-ce qui génère cette tension?")
+        if amygdala.fear_level>.3 and not foc: self.meta_questions.append("pourquoi cette inquiétude sans objet précis?")
+        if nt.mood_valence<-.3 and nt.arousal_level<.4: self.meta_questions.append("qu'est-ce qui manque?")
+        if sal: self.meta_questions.append("ce souvenir est-il lié à l'instant?")
+        if nt.dopamine>.65 and not amygdala.reward_signal>.3: self.meta_questions.append("vers quoi ce désir se dirige-t-il?")
         return self.self_report
-
-    def get_state(self) -> dict:
-        return {"self_report": self.self_report, "meta_questions": self.meta_questions,
-                "self_coherence": round(self.self_coherence, 3)}
+    def get_state(self): return {"self_report":self.self_report,"meta_questions":self.meta_questions,"self_coherence":round(self.self_coherence,3)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §8  MATRICE ÉMOTIONNELLE — TOP 3 + HUMEUR DE FOND
+# §14  MATRICE ÉMOTIONNELLE — Top 3 + humeur de fond
 # ─────────────────────────────────────────────────────────────────────────────
 
-EMOTION_MAP = [
-    ( 0.5, 1.0, 0.65,1.0,  "joy",          "joie / euphorie"),
-    ( 0.25,0.7, 0.55,0.9,  "excitement",   "excitation"),
-    ( 0.15,0.55,0.45,0.75, "interest",     "intérêt / curiosité"),
-    ( 0.3, 0.8, 0.35,0.7,  "enthusiasm",   "enthousiasme"),
-    ( 0.3, 0.7, 0.25,0.55, "pleasure",     "plaisir"),
-    ( 0.2, 0.6, 0.15,0.45, "satisfaction", "satisfaction"),
-    ( 0.35,1.0, 0.0, 0.35, "contentment",  "contentement"),
-    ( 0.1, 0.45,0.0, 0.25, "calm",         "calme"),
-    ( 0.45,1.0, 0.15,0.5,  "happiness",    "bonheur"),
-    (-1.0,-0.45,0.6, 1.0,  "fear",         "peur"),
-    (-0.7,-0.25,0.5, 0.9,  "anger",        "colère"),
-    (-0.5,-0.15,0.45,0.8,  "anxiety",      "anxiété"),
-    (-0.8,-0.35,0.7, 1.0,  "panic",        "panique"),
-    (-0.6,-0.2, 0.35,0.65, "unease",       "malaise"),
-    (-1.0,-0.35,0.0, 0.45, "sadness",      "tristesse"),
-    (-0.5,-0.05,0.05,0.35, "boredom",      "ennui"),
-    (-0.6,-0.15,0.0, 0.2,  "depression",   "abattement"),
-    (-0.4,-0.1, 0.15,0.45, "melancholy",   "mélancolie"),
-    (-0.3, 0.3, 0.15,0.55, "neutral",      "neutre"),
-    (-0.15,0.35,0.35,0.65, "alert",        "alerte"),
-    (-0.2, 0.2, 0.55,0.85, "aroused",      "éveillé"),
-    (-0.3, 0.15,0.0, 0.2,  "tired",        "fatigué"),
-    ( 0.0, 0.4, 0.0, 0.5,  "serene",       "serein"),
-    (-0.2, 0.3, 0.2, 0.5,  "pensive",      "songeur"),
+EMOTION_MAP=[
+    (.5,1.,.65,1.,"joy","joie / euphorie"),(.25,.7,.55,.9,"excitement","excitation"),
+    (.15,.55,.45,.75,"interest","intérêt / curiosité"),(.3,.8,.35,.7,"enthusiasm","enthousiasme"),
+    (.3,.7,.25,.55,"pleasure","plaisir"),(.2,.6,.15,.45,"satisfaction","satisfaction"),
+    (.35,1.,0.,.35,"contentment","contentement"),(.1,.45,0.,.25,"calm","calme"),
+    (.45,1.,.15,.5,"happiness","bonheur"),
+    (-1.,-.45,.6,1.,"fear","peur"),(-0.7,-.25,.5,.9,"anger","colère"),
+    (-.5,-.15,.45,.8,"anxiety","anxiété"),(-.8,-.35,.7,1.,"panic","panique"),
+    (-.6,-.2,.35,.65,"unease","malaise"),(-.5,-.05,.05,.35,"boredom","ennui"),
+    (-1.,-.35,0.,.45,"sadness","tristesse"),(-.6,-.15,0.,.2,"depression","abattement"),
+    (-.4,-.1,.15,.45,"melancholy","mélancolie"),
+    (-.3,.3,.15,.55,"neutral","neutre"),
+    (-.15,.35,.35,.65,"alert","alerte"),(-.2,.2,.55,.85,"aroused","éveillé"),
+    (-.3,.15,0.,.2,"tired","fatigué"),(0.,.4,0.,.5,"serene","serein"),
+    (-.2,.3,.2,.5,"pensive","songeur"),
+    (.4,1.,.5,.9,"desire","désir / passion"),   # NOUVELLE: désir/passion
+    (-.8,-.3,.3,.7,"disgust","dégoût / répulsion"), # NOUVELLE: dégoût
 ]
 
-def get_emotion_matrix(valence:float, arousal:float, n:int=3) -> list[dict]:
-    """
-    Retourne les N émotions dominantes avec leur poids (softmax sur proximité inverse).
-    Modèle le fait que plusieurs émotions coexistent simultanément.
-    """
-    scored = []
+def get_emotion_matrix(v,a,n=3):
+    scored=[]
     for mn_v,mx_v,mn_a,mx_a,lbl,lbl_fr in EMOTION_MAP:
         cv=(mn_v+mx_v)/2; ca=(mn_a+mx_a)/2
-        # Distance euclidienne centrée
-        dist=((valence-cv)**2+(arousal-ca)**2)**.5
-        # Bonus si dans la zone
-        in_zone=1.2 if (mn_v<=valence<=mx_v and mn_a<=arousal<=mx_a) else 1.0
-        score=in_zone/(dist+0.001)
-        scored.append((score,lbl,lbl_fr))
+        dist=((v-cv)**2+(a-ca)**2)**.5
+        bonus=1.2 if (mn_v<=v<=mx_v and mn_a<=a<=mx_a) else 1.
+        scored.append((bonus/(dist+.001),lbl,lbl_fr))
     scored.sort(key=lambda x:-x[0])
-    top=scored[:n+2]  # prendre un peu plus pour softmax
-    total=sum(s for s,_,_ in top)
+    top=scored[:n+2]; total=sum(s for s,_,_ in top)
     return [{"label":lbl,"label_fr":lbl_fr,"weight":round(s/total,3)} for s,lbl,lbl_fr in top[:n]]
 
 
 class EmotionalStateTracker:
     def __init__(self):
-        self._v=0.; self._a=0.3; self._intensity=0.; self._duration=1; self._last=""
-        self._history:list=[]
-        # Humeur de fond (timescale lente — jours en vrai, ~50 ticks ici)
-        self._background_valence=0.05
-        self._background_arousal=0.35
-
-    def update(self, amygdala:Amygdala, insula:Insula, nt:NeurotransmitterSystem) -> None:
+        self._v=0.; self._a=.3; self._intensity=0.; self._duration=1; self._last=""
+        self._history=[]; self._bg_v=.05; self._bg_a=.35
+    def update(self,amygdala,insula,nt):
         iv=amygdala.emotional_valence*.4+insula.felt_emotion.get("valence",0.)*.3+nt.mood_valence*.3
         ia=amygdala.emotional_arousal*.4+insula.felt_emotion.get("arousal",.3)*.3+nt.arousal_level*.3
-        smooth=max(.4,.7-min(1.,abs(iv)+ia)*.3)
-        self._v=self._v*smooth+iv*(1-smooth)
-        self._a=self._a*smooth+ia*(1-smooth)
-        # Humeur de fond (décroissance très lente vers neutre)
-        self._background_valence=self._background_valence*.995+nt.mood_valence*.005
-        self._background_arousal=self._background_arousal*.995+nt.arousal_level*.005
+        sm=max(.4,.7-min(1.,abs(iv)+ia)*.3)
+        self._v=self._v*sm+iv*(1-sm); self._a=self._a*sm+ia*(1-sm)
+        self._bg_v=self._bg_v*.995+nt.mood_valence*.005; self._bg_a=self._bg_a*.995+nt.arousal_level*.005
         self._intensity=(abs(self._v)+self._a)/2
-        matrix=get_emotion_matrix(self._v,self._a)
-        top_label=matrix[0]["label"] if matrix else "neutral"
-        self._duration=self._duration+1 if top_label==self._last else 1
-        self._last=top_label
-        self._history.append({"valence":round(self._v,3),"arousal":round(self._a,3),
-            "label":top_label,"intensity":round(self._intensity,3)})
+        mat=get_emotion_matrix(self._v,self._a); top=mat[0]["label"] if mat else "neutral"
+        self._duration=self._duration+1 if top==self._last else 1; self._last=top
+        self._history.append({"valence":round(self._v,3),"arousal":round(self._a,3),"label":top,"intensity":round(self._intensity,3)})
         if len(self._history)>100: self._history.pop(0)
-
-    def current_state(self) -> dict:
-        matrix=get_emotion_matrix(self._v,self._a,3)
-        top=matrix[0] if matrix else {"label":"neutral","label_fr":"neutre","weight":1.0}
-        return {"label":top["label"],"label_fr":top["label_fr"],
-                "valence":round(self._v,3),"arousal":round(self._a,3),
-                "intensity":round(self._intensity,3),"duration":self._duration,
-                "emotion_matrix":matrix,
-                "background":{"valence":round(self._background_valence,3),
-                               "arousal":round(self._background_arousal,3)}}
-
+    def current_state(self):
+        mat=get_emotion_matrix(self._v,self._a,3); top=mat[0] if mat else {"label":"neutral","label_fr":"neutre","weight":1.}
+        return {"label":top["label"],"label_fr":top["label_fr"],"valence":round(self._v,3),"arousal":round(self._a,3),
+                "intensity":round(self._intensity,3),"duration":self._duration,"emotion_matrix":mat,
+                "background":{"valence":round(self._bg_v,3),"arousal":round(self._bg_a,3)}}
     def get_history(self): return list(self._history)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# §9  CONSCIENCE
-# ─────────────────────────────────────────────────────────────────────────────
-
 class ConsciousnessMonitor:
-    def __init__(self):
-        self._level=0.5; self._meta=0.; self._content="background"; self._ws:list=[]
+    def __init__(self): self._level=.5; self._meta=0.; self._content="background"; self._ws=[]
     def update(self,pfc,thalamus,dmn,signals,tick):
-        strong=[s for s in signals if s.strength>0.4]
-        diversity=len(set(s.signal_type for s in strong))
-        richness=min(1.,diversity*.15+len(strong)*.05)
-        dmn_c=dmn.activation*.3 if dmn.mind_wandering else 0.
+        strong=[s for s in signals if s.strength>.4]; div=len(set(s.signal_type for s in strong))
+        richness=min(1.,div*.15+len(strong)*.05); dmn_c=dmn.activation*.3 if dmn.mind_wandering else 0.
         new=thalamus.attention_gate*.25+pfc.activation*.30+max(.2,1.-pfc.fatigue*.6)*.15+richness*.20+dmn_c*.10
         self._level=self._level*.8+new*.2
         if pfc.cognitive_load<.7 and pfc.activation>.3:
             ints=[s for s in signals if s.signal_type=="internal"]
             self._meta=min(1.,self._meta*.8+len(ints)*.1) if ints else self._meta*.9
         else: self._meta*=.85
-        self._content=(f"{max(strong,key=lambda s:s.strength).source}" if strong
-                       else ("internal" if dmn.mind_wandering else "background"))
+        self._content=(f"{max(strong,key=lambda s:s.strength).source}" if strong else("internal" if dmn.mind_wandering else "background"))
         self._ws=[{"source":s.source,"type":s.signal_type,"strength":round(s.strength,3)} for s in strong[:5]]
     def current_state(self):
-        lbl=("unconscious" if self._level<.2 else "subconscious" if self._level<.4
-             else "conscious" if self._level<.65 else "focused" if self._level<.85 else "heightened")
-        return {"level":round(self._level,3),"label":lbl,"meta_awareness":round(self._meta,3),
-                "content":self._content,"global_workspace":self._ws}
+        lbl=("unconscious" if self._level<.2 else "subconscious" if self._level<.4 else "conscious" if self._level<.65 else "focused" if self._level<.85 else "heightened")
+        return {"level":round(self._level,3),"label":lbl,"meta_awareness":round(self._meta,3),"content":self._content,"global_workspace":self._ws}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §10  CERVEAU COMPLET — ORCHESTRATEUR
+# §15  CERVEAU COMPLET
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Brain:
-    """
-    Cerveau complet avec corps numérique intégré.
-    Boucle complète: Monde → Corps → Cerveau → Corps → Conscience
-    """
     def __init__(self):
-        self.nt    = NeurotransmitterSystem()
-        # Corps
-        self.body  = BodySystem()
+        self.nt=NeurotransmitterSystem(); self.body=BodySystem()
+        # Psyché
+        self.relationships    = RelationshipModel()
+        self.needs            = NeedSystem()
+        self.freud            = FreudianDynamics()
+        self.desire           = DesireEngine()
+        self.overwhelm        = OverwhelmMonitor()
+        self.autonomous_expr  = AutonomousExpression()
         # Régions
-        self.brainstem=Brainstem(); self.thalamus=Thalamus()
-        self.amygdala=Amygdala();   self.hippocampus=Hippocampus()
-        self.pfc=PrefrontalCortex(); self.basal_ganglia=BasalGanglia()
-        self.cerebellum=Cerebellum(); self.insula=Insula()
-        self.cingulate=CingulateCortex(); self.sensory_cortex=SensoryCortex()
-        self.dmn=DefaultModeNetwork()
-        self._regions={
-            "brainstem":self.brainstem,"thalamus":self.thalamus,
-            "amygdala":self.amygdala,"hippocampus":self.hippocampus,
-            "prefrontal_cortex":self.pfc,"basal_ganglia":self.basal_ganglia,
-            "cerebellum":self.cerebellum,"insula":self.insula,
-            "cingulate_cortex":self.cingulate,"sensory_cortex":self.sensory_cortex,
-            "default_mode_network":self.dmn,
-        }
-        # Systèmes émergents
-        self.impulse_engine    = ImpulseEngine()
-        self.introspection     = IntrospectionEngine()
-        self.emotional_tracker = EmotionalStateTracker()
-        self.consciousness     = ConsciousnessMonitor()
-        self._tick=0; self.last_action:Optional[str]=None
+        self.brainstem=Brainstem(); self.thalamus=Thalamus(); self.amygdala=Amygdala()
+        self.hippocampus=Hippocampus(); self.pfc=PrefrontalCortex(); self.basal_ganglia=BasalGanglia()
+        self.cerebellum=Cerebellum(); self.insula=Insula(); self.cingulate=CingulateCortex()
+        self.sensory_cortex=SensoryCortex(); self.dmn=DefaultModeNetwork()
+        self._regions={"brainstem":self.brainstem,"thalamus":self.thalamus,"amygdala":self.amygdala,
+            "hippocampus":self.hippocampus,"prefrontal_cortex":self.pfc,"basal_ganglia":self.basal_ganglia,
+            "cerebellum":self.cerebellum,"insula":self.insula,"cingulate_cortex":self.cingulate,
+            "sensory_cortex":self.sensory_cortex,"default_mode_network":self.dmn}
+        # Suivi
+        self.impulse_engine=ImpulseEngine(); self.introspection=IntrospectionEngine()
+        self.emotional_tracker=EmotionalStateTracker(); self.consciousness=ConsciousnessMonitor()
+        self._tick=0; self.last_action=None
 
     def sense(self, stim: SensoryInput) -> dict:
-        """Input principal: SensoryInput dimensionnel → passe par le corps."""
+        """Input principal: passe par le contexte relationnel puis le corps."""
+        stim = self.relationships.apply_to_stimulus(stim, self.nt)
         body_signals = self.body.process(stim, self.nt)
         for sig in body_signals:
             t=sig.target
             if t in self._regions: self._regions[t].receive(sig)
+        # Mettre à jour la relation après interaction
+        if stim.agent_id and stim.overall_intensity() > 0.1:
+            self.relationships.update_from_interaction(stim.agent_id, stim.sem_valence, delta=0.03)
         return self.tick()
 
-    def perceive(self, stimulus:dict) -> dict:
-        """Input legacy: dict simple → converti en SensoryInput minimal."""
+    def perceive(self, stimulus: dict) -> dict:
+        """Input legacy dict."""
         si=SensoryInput(
-            meca_force=stimulus.get("threat",0.)*0.5,
-            meca_vitesse=stimulus.get("threat",0.)*0.7,
-            sem_valence=stimulus.get("valence",0.),
-            sem_charge=stimulus.get("intensity",0.5),
-            sem_arousal=stimulus.get("arousal",0.3),
-            sem_menace=stimulus.get("threat",0.),
-            chem_da=stimulus.get("reward",0.)*0.3,
-            novelty=stimulus.get("novelty",0.5),
-            stimulus_id=stimulus.get("stimulus_id",""),
+            meca_force=stimulus.get("threat",0.)*.5, meca_vitesse=stimulus.get("threat",0.)*.7,
+            sem_valence=stimulus.get("valence",0.), sem_charge=stimulus.get("intensity",.5),
+            sem_arousal=stimulus.get("arousal",.3), sem_menace=stimulus.get("threat",0.),
+            chem_da=stimulus.get("reward",0.)*.3, novelty=stimulus.get("novelty",.5),
+            stimulus_id=stimulus.get("stimulus_id",""), agent_id=stimulus.get("agent_id",""),
         )
-        if stimulus.get("modality")=="threat": si.meca_force=max(si.meca_force,stimulus.get("intensity",.5)*.4)
-        if stimulus.get("modality")=="social": si.sem_social=0.7; nt_mod={"oxytocin":0.05}; self.nt.modulate(nt_mod)
         return self.sense(si)
 
     def tick(self) -> dict:
         self._tick+=1
-        all_emitted:list[NeuralSignal]=[]
+        all_emitted=[]
         for r in self._regions.values():
             all_emitted.extend(r.process(self.nt))
-
         for sig in all_emitted:
             t=sig.target
-            if t in self._regions:   self._regions[t].receive(sig)
+            if t in self._regions: self._regions[t].receive(sig)
             elif t=="output":
                 if sig.content.get("action"): self.last_action=sig.content["action"]
             elif t=="broadcast":
                 for r in self._regions.values(): r.receive(sig)
-
-        # DMN reçoit un signal de repos systématiquement
         self.dmn.receive(NeuralSignal("brain","default_mode_network","internal",{"tick":self._tick},.1))
-
-        # Élans spontanés
-        imp=self.impulse_engine.tick(self.nt,self.pfc,self.hippocampus,self._tick)
-        if imp:
-            all_emitted.append(imp); self.dmn.receive(imp)
-
-        # Introspection
+        imp=self.impulse_engine.tick(self.nt,self.pfc,self.hippocampus,self._tick,self.needs)
+        if imp: all_emitted.append(imp); self.dmn.receive(imp)
         self.introspection.tick(self.amygdala,self.insula,self.pfc,self.hippocampus,self.nt,self._tick)
-
-        # Homéostasie chimique
         self.nt.decay()
-
-        # Décroissance passive de la douleur (même sans nouveau stimulus)
-        self.body.nociception.fast_pain = max(0.0, self.body.nociception.fast_pain - 0.08)
-        self.body.nociception.slow_pain = max(0.0, self.body.nociception.slow_pain - 0.04)
-
-        # Boucle efférente cerveau → corps → insula
+        # Décroissance passive de la douleur
+        self.body.nociception.fast_pain=max(0.,self.body.nociception.fast_pain-.08)
+        self.body.nociception.slow_pain=max(0.,self.body.nociception.slow_pain-.04)
+        # Boucle cerveau → corps → insula
         ans_sig=self.body.update_from_brain(self.amygdala.fear_level,self.pfc.inhibition_signal,self.nt)
         if ans_sig: self.insula.receive(ans_sig)
-
         # États émergents
         self.emotional_tracker.update(self.amygdala,self.insula,self.nt)
         self.consciousness.update(self.pfc,self.thalamus,self.dmn,all_emitted,self._tick)
-
+        # Psyché
+        emo=self.emotional_tracker.current_state()
+        brain_state={"pfc_fatigue":self.pfc.fatigue,"pain":self.body.nociception.total_pain,
+            "threat_level":self.amygdala.fear_level,"action_taken":self.last_action is not None,
+            "mind_wandering":self.dmn.mind_wandering,"social_contact":self.nt.oxytocin>0.5,
+            "intimate_contact":False,"expression_occurred":self.autonomous_expr.last_expression is not None,
+            "insight":self.pfc.prediction_error>.4}
+        self.needs.tick(self.nt, brain_state)
+        self.freud.update(emo,self.needs,self.nt,self.pfc.fatigue)
+        self.desire.update(emo,self.needs,self.nt,self.freud,self.pfc.fatigue)
+        self.overwhelm.update(emo["intensity"],self.pfc.fatigue,self.nt,self.amygdala.fear_level,self.amygdala.emotional_valence,self.freud)
+        # Expression autonome
+        expr=self.autonomous_expr.generate(self.needs,self.desire,self.overwhelm,self.freud,self.impulse_engine,self.dmn,self.nt,self.pfc,self._tick)
+        # Si expression → satisfaire le besoin d'expression
+        if expr and expr.get("type") in ("desire_action","creative_impulse","need_assertion"):
+            self.needs.satisfy("expression",.03); self.needs.satisfy("autonomy",.01)
         return self.get_state()
 
-    def inject_reward(self, v:float) -> None:
-        self.basal_ganglia.receive(NeuralSignal("env","basal_ganglia","reward",
-            {"reward_received":v},abs(v),v))
-        if v>0: self.nt.modulate({"dopamine":v*.1,"serotonin":v*.03})
+    def inject_reward(self,v):
+        self.basal_ganglia.receive(NeuralSignal("env","basal_ganglia","reward",{"reward_received":v},abs(v),v))
+        if v>0: self.nt.modulate({"dopamine":v*.1,"serotonin":v*.03}); self.needs.satisfy("recognition",v*.05)
         else: self.nt.modulate({"cortisol":abs(v)*.05})
 
     def get_state(self) -> dict:
@@ -1380,80 +1577,84 @@ class Brain:
             "neurotransmitters":self.nt.snapshot(),
             "emotional_state":self.emotional_tracker.current_state(),
             "consciousness":self.consciousness.current_state(),
-            "body_state":self.body.state.copy(),
+            "body_state":dict(self.body.state),
             "impulse":self.impulse_engine.get_state(),
             "introspection":self.introspection.get_state(),
+            "needs":self.needs.get_state(),
+            "freud":self.freud.get_state(),
+            "desire":self.desire.get_state(),
+            "overwhelm":self.overwhelm.get_state(),
+            "autonomous_expression":self.autonomous_expr.last_expression,
             "last_action":self.last_action,
         }
 
     def get_summary(self) -> dict:
         emo=self.emotional_tracker.current_state(); con=self.consciousness.current_state()
-        imp=self.impulse_engine
         return {
-            "tick":self._tick,
-            "emotion":emo["label"],"emotion_fr":emo["label_fr"],
-            "emotion_matrix":emo["emotion_matrix"],
-            "valence":round(self.nt.mood_valence,3),"arousal":round(self.nt.arousal_level,3),
-            "stress":round(self.nt.stress_level,3),"motivation":round(self.nt.motivation,3),
-            "action":self.last_action,"consciousness_level":round(con["level"],3),
-            "mind_wandering":self.dmn.mind_wandering,
+            "tick":self._tick, "emotion":emo["label"], "emotion_fr":emo["label_fr"],
+            "emotion_matrix":emo["emotion_matrix"], "valence":round(self.nt.mood_valence,3),
+            "arousal":round(self.nt.arousal_level,3), "stress":round(self.nt.stress_level,3),
+            "motivation":round(self.nt.motivation,3), "action":self.last_action,
+            "consciousness_level":round(con["level"],3), "mind_wandering":self.dmn.mind_wandering,
             "pfc_load":round(self.pfc.cognitive_load,3),
-            "impulse":imp.current_impulse,"impulse_strength":round(imp.impulse_strength,3),
+            "impulse":self.impulse_engine.current_impulse,
+            "impulse_strength":round(self.impulse_engine.impulse_strength,3),
             "pain":round(self.body.nociception.total_pain,3),
             "heart_rate":round(self.body.ans.heart_rate,3),
             "background_mood":emo["background"],
+            # Psyché
+            "desire_level":round(self.desire.desire_level,3),
+            "desire_type":self.desire.desire_type,
+            "physical_arousal":round(self.desire.physical_arousal,3),
+            "boldness":round(self.desire.boldness,3),
+            "intention":self.desire.intention,
+            "overwhelmed":self.overwhelm.flooded,
+            "flood_type":self.overwhelm.flood_type,
+            "id_pressure":round(self.freud.id_pressure,3),
+            "superego_brake":round(self.freud.superego_brake,3),
+            "ego_strength":round(self.freud.ego_strength,3),
+            "defense":self.freud.defense,
+            "guilt":round(self.freud.guilt,3),
+            "anxiety":round(self.freud.anxiety,3),
+            "autonomous_expression":self.autonomous_expr.last_expression,
         }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §11  API PUBLIQUE
+# §16  API PUBLIQUE
 # ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
 class PerceptionResult:
-    """
-    Résultat complet d'un cycle de traitement.
-
-    ÉMOTIONNEL:
-      emotion        str          dominant: "joy","fear","calm","anxiety","melancholy"...
-      emotion_fr     str          français: "joie / euphorie"...
-      emotion_matrix list[dict]   top-3 avec poids ex: [{"label":"fear","weight":0.54}, ...]
-      valence        float -1→+1  valence intégrée
-      arousal        float 0→1    niveau d'éveil
-      background     dict         humeur de fond (timescale lente)
-
-    CONSCIENCE:
-      consciousness  float 0→1    niveau de conscience
-      meta_awareness float 0→1    méta-conscience / introspection
-      mind_wandering bool         DMN actif (rêverie)
-
-    DÉCISION:
-      action         str|None     "approach","avoid","explore","engage","maintain","rest"
-
-    CORPS:
-      body_state     dict         métriques physiologiques complètes
-      pain           float 0→1    niveau de douleur total
-      heart_rate     float        fréquence cardiaque normalisée
-
-    SPONTANÉ:
-      impulse        str|None     élan actuel: "curiosity","social","creative","rest"...
-      introspection  dict         rapport de méta-conscience (si disponible)
-
-    NEUROCHIMIE:
-      stress         float 0→1    niveau de stress émergent
-      motivation     float 0→1    motivation
-      mood           float -1→+1  humeur neurochimique
-    """
-    emotion:str; emotion_fr:str; emotion_matrix:list
-    valence:float; arousal:float; emotion_intensity:float; emotion_duration:int
-    background:dict; consciousness:float; consciousness_label:str
-    meta_awareness:float; mind_wandering:bool
-    action:Optional[str]; action_confidence:float
+    """Résultat complet d'un cycle. Tous les champs sont accessibles."""
+    # Émotionnel
+    emotion:str; emotion_fr:str; emotion_matrix:list; valence:float; arousal:float
+    emotion_intensity:float; emotion_duration:int; background:dict
+    # Conscience
+    consciousness:float; consciousness_label:str; meta_awareness:float; mind_wandering:bool
+    # Corps
     body_state:dict; pain:float; heart_rate:float; ans_balance:float
-    impulse:Optional[str]; impulse_strength:float; impulse_meaning:str
-    introspection:dict; meta_questions:list
+    # Décision
+    action:Optional[str]; action_confidence:float
+    # Besoins
+    urgent_needs:list       # [(name, level, urgency)] top-3
+    total_drive:float       # drive global 0-1
+    # Psyché freudienne
+    id_pressure:float; superego_brake:float; ego_strength:float
+    defense_mechanism:str; anxiety:float; guilt:float
+    # Désir
+    desire_level:float; desire_type:Optional[str]; physical_arousal:float
+    wanting:float; liking:float; passion:float; boldness:float
+    intention:Optional[str]; intention_strength:float
+    # Submersion
+    overwhelmed:bool; overwhelm_level:float; flood_type:Optional[str]
+    # Expression autonome
+    autonomous_expression:Optional[dict]
+    # Charge
     cognitive_load:float; pfc_fatigue:float
+    # Neurochimie
     stress:float; motivation:float; mood:float
+    # Mémoire
     memory_count:int; last_encoded:bool; tick:int
     _full_state:dict=field(default_factory=dict,repr=False)
 
@@ -1461,398 +1662,399 @@ class PerceptionResult:
         return {
             "tick":self.tick,"emotion":self.emotion,"emotion_fr":self.emotion_fr,
             "emotion_matrix":self.emotion_matrix,"valence":self.valence,"arousal":self.arousal,
-            "emotion_intensity":self.emotion_intensity,"background":self.background,
-            "consciousness":self.consciousness,"consciousness_label":self.consciousness_label,
-            "meta_awareness":self.meta_awareness,"mind_wandering":self.mind_wandering,
-            "action":self.action,"action_confidence":self.action_confidence,
+            "background":self.background,"consciousness":self.consciousness,
             "body_state":self.body_state,"pain":self.pain,"heart_rate":self.heart_rate,
-            "impulse":self.impulse,"impulse_meaning":self.impulse_meaning,
-            "introspection":self.introspection,"meta_questions":self.meta_questions,
-            "cognitive_load":self.cognitive_load,"stress":self.stress,
-            "motivation":self.motivation,"mood":self.mood,
-            "memory_count":self.memory_count,
+            "action":self.action,"urgent_needs":self.urgent_needs,"total_drive":self.total_drive,
+            "id_pressure":self.id_pressure,"superego_brake":self.superego_brake,"ego_strength":self.ego_strength,
+            "defense_mechanism":self.defense_mechanism,"anxiety":self.anxiety,"guilt":self.guilt,
+            "desire_level":self.desire_level,"desire_type":self.desire_type,
+            "physical_arousal":self.physical_arousal,"wanting":self.wanting,"liking":self.liking,
+            "boldness":self.boldness,"intention":self.intention,"intention_strength":self.intention_strength,
+            "overwhelmed":self.overwhelmed,"flood_type":self.flood_type,
+            "autonomous_expression":self.autonomous_expression,
+            "stress":self.stress,"motivation":self.motivation,
         }
 
     def __str__(self):
         top3=" + ".join(f"{e['label']}({e['weight']:.0%})" for e in self.emotion_matrix)
-        imp=f"[élan:{self.impulse}]" if self.impulse else ""
-        pain=f" DOULEUR={self.pain:.2f}" if self.pain>0.1 else ""
+        imp=f"[élan:{self.autonomous_expression['type']}]" if self.autonomous_expression else ""
+        pain=f" DOULEUR={self.pain:.2f}" if self.pain>.1 else ""
+        flood=f" ⚡{self.flood_type}" if self.overwhelmed else ""
         return (f"[t={self.tick}] {top3} | v={self.valence:+.2f} a={self.arousal:.2f} "
-                f"| action={self.action} | ♡={self.heart_rate:.2f}{pain} {imp}")
+                f"| désir={self.desire_level:.2f} audace={self.boldness:.2f} "
+                f"| ♡={self.heart_rate:.2f}{pain}{flood} {imp}")
 
 
 class DeepBrain:
     """
-    Interface complète pour Deep Sanctuary v2.
+    Interface complète — Deep Sanctuary v3.
 
-    USAGE MINIMAL:
+    USAGE:
         brain = DeepBrain()
-        # SensoryInput dimensionnel (sans labels)
-        r = brain.sense(SensoryInput(meca_force=0.8, meca_vitesse=0.9,
-                                      meca_zone=0.2, location="visage"))
-        print(r.emotion_matrix)  # top-3 émotions
-        print(r.body_state)      # état physiologique
-        print(r.impulse)         # élan spontané
-        print(r.pain)            # douleur
-
-        # Ou format dict simple (legacy)
-        r = brain.perceive({"modality":"threat","threat":0.8,"valence":-0.7})
+        brain.relationship("alex", trust=0.9, affection=0.85, intimacy=0.75)
+        r = brain.sense(SensoryInput(meca_force=0.1, meca_zone=0.7,
+                                      sem_intimite=0.9, agent_id="alex"))
+        print(r.emotion_matrix)         # top-3 émotions
+        print(r.desire_level)           # intensité du désir
+        print(r.physical_arousal)       # arousal physique
+        print(r.urgent_needs)           # besoins urgents
+        print(r.autonomous_expression)  # ce que le système dit spontanément
+        print(r.overwhelmed)            # perte de contrôle?
     """
-    def __init__(self):
-        self._brain=Brain(); self._prev_mc=0
+    def __init__(self): self._brain=Brain(); self._prev_mc=0
 
-    def sense(self, stim:SensoryInput) -> PerceptionResult:
-        """Input dimensionnel via SensoryInput."""
+    def sense(self,stim:SensoryInput) -> PerceptionResult:
         return self._to_result(self._brain.sense(stim))
-
-    def perceive(self, stimulus:dict) -> PerceptionResult:
-        """Input legacy dict."""
+    def perceive(self,stimulus:dict) -> PerceptionResult:
         return self._to_result(self._brain.perceive(stimulus))
-
     def tick(self) -> PerceptionResult:
         return self._to_result(self._brain.tick())
+    def reward(self,v:float): self._brain.inject_reward(max(-1.,min(1.,v)))
+    def inject(self,nts:dict): self._brain.nt.modulate(nts)
 
-    def reward(self, v:float) -> None:
-        self._brain.inject_reward(max(-1.,min(1.,v)))
+    def relationship(self, agent_id:str, trust:float=0.3, affection:float=0.0,
+                     intimacy:float=0.0, familiarity:float=0.1) -> None:
+        """Définit ou met à jour une relation avec un agent."""
+        self._brain.relationships.set(agent_id, trust=trust, affection=affection,
+                                       intimacy=intimacy, familiarity=familiarity)
 
-    def inject(self, nts:dict[str,float]) -> None:
-        self._brain.nt.modulate(nts)
-
-    def get_neurochemistry(self) -> dict:
-        return self._brain.nt.snapshot()
-
-    def get_body_state(self) -> dict:
-        return dict(self._brain.body.state)
-
-    def get_memory_traces(self) -> list:
-        return [{"episode_id":t.episode_id,"strength":round(t.strength,3),
-                 "emotional_tag":round(t.emotional_tag,3),"valence":round(t.valence,3)}
-                for t in self._brain.hippocampus._traces]
-
-    def get_emotional_history(self) -> list:
-        return self._brain.emotional_tracker.get_history()
-
+    def get_neurochemistry(self): return self._brain.nt.snapshot()
+    def get_needs(self): return self._brain.needs.get_state()
+    def get_body_state(self): return dict(self._brain.body.state)
+    def get_memory_traces(self):
+        return [{"episode_id":t.episode_id,"strength":round(t.strength,3),"emotional_tag":round(t.emotional_tag,3),"valence":round(t.valence,3)} for t in self._brain.hippocampus._traces]
+    def get_emotional_history(self): return self._brain.emotional_tracker.get_history()
     @property
-    def tick_count(self) -> int:
-        return self._brain._tick
+    def tick_count(self): return self._brain._tick
 
-    def _to_result(self, state:dict) -> PerceptionResult:
+    def _to_result(self,state:dict) -> PerceptionResult:
         emo=state["emotional_state"]; con=state["consciousness"]; nt=self._brain.nt
         bg=state["regions"].get("basal_ganglia",{}); pfc=state["regions"]["prefrontal_cortex"]
-        imp=state["impulse"]; intro=state["introspection"]
+        des=state["desire"]; frd=state["freud"]; ovr=state["overwhelm"]; nds=state["needs"]
         action=bg.get("selected_action") or state.get("last_action")
         cur=len(self._brain.hippocampus._traces); enc=cur>self._prev_mc; self._prev_mc=cur
-        bs=dict(state["body_state"]); bs.update({
-            "pain_fast":round(self._brain.body.nociception.fast_pain,3),
-            "pain_slow":round(self._brain.body.nociception.slow_pain,3),
-        })
-        imp_type=imp.get("impulse"); imp_meaning=""
-        if imp_type: imp_meaning=ImpulseEngine.TYPES.get(imp_type,("",""))[1]
+        bs=dict(state["body_state"]); bs.update({"pain_fast":round(self._brain.body.nociception.fast_pain,3),"pain_slow":round(self._brain.body.nociception.slow_pain,3)})
         return PerceptionResult(
             tick=state["tick"],emotion=emo["label"],emotion_fr=emo["label_fr"],
             emotion_matrix=emo["emotion_matrix"],valence=emo["valence"],arousal=emo["arousal"],
-            emotion_intensity=emo["intensity"],emotion_duration=emo["duration"],
-            background=emo["background"],consciousness=con["level"],consciousness_label=con["label"],
-            meta_awareness=con["meta_awareness"],mind_wandering=self._brain.dmn.mind_wandering,
+            emotion_intensity=emo["intensity"],emotion_duration=emo["duration"],background=emo["background"],
+            consciousness=con["level"],consciousness_label=con["label"],meta_awareness=con["meta_awareness"],
+            mind_wandering=self._brain.dmn.mind_wandering,body_state=bs,
+            pain=round(self._brain.body.nociception.total_pain,3),
+            heart_rate=round(self._brain.body.ans.heart_rate,3),ans_balance=round(self._brain.body.ans.balance,3),
             action=action,action_confidence=round(self._brain.basal_ganglia._av.get(action or "maintain",.5),3),
-            body_state=bs,pain=round(self._brain.body.nociception.total_pain,3),
-            heart_rate=round(self._brain.body.ans.heart_rate,3),
-            ans_balance=round(self._brain.body.ans.balance,3),
-            impulse=imp_type,impulse_strength=round(imp.get("strength",0.),3),
-            impulse_meaning=imp_meaning,
-            introspection=intro.get("self_report",{}),meta_questions=intro.get("meta_questions",[]),
+            urgent_needs=self._brain.needs.top_urgent(3),total_drive=round(self._brain.needs.get_total_drive(),3),
+            id_pressure=round(frd["id_pressure"],3),superego_brake=round(frd["superego_brake"],3),
+            ego_strength=round(frd["ego_strength"],3),defense_mechanism=frd["defense"],
+            anxiety=round(frd["anxiety"],3),guilt=round(frd["guilt"],3),
+            desire_level=round(des["desire_level"],3),desire_type=des["desire_type"],
+            physical_arousal=round(des["physical_arousal"],3),
+            wanting=round(des["wanting"],3),liking=round(des["liking"],3),passion=round(des["passion"],3),
+            boldness=round(des["boldness"],3),intention=des["intention"],
+            intention_strength=round(des["intention_strength"],3),
+            overwhelmed=ovr["flooded"],overwhelm_level=round(ovr["overwhelm_level"],3),
+            flood_type=ovr["flood_type"],autonomous_expression=state["autonomous_expression"],
             cognitive_load=pfc.get("cognitive_load",0.),pfc_fatigue=pfc.get("fatigue",0.),
-            stress=round(nt.stress_level,3),motivation=round(nt.motivation,3),
-            mood=round(nt.mood_valence,3),memory_count=cur,last_encoded=enc,
-            _full_state=state,
+            stress=round(nt.stress_level,3),motivation=round(nt.motivation,3),mood=round(nt.mood_valence,3),
+            memory_count=cur,last_encoded=enc,_full_state=state,
         )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §12  VISUALISATION
+# §17  VISUALISATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _bar(v,w=18): filled=int(max(0.,min(1.,v))*w); return "█"*filled+"░"*(w-filled)
+def _bar(v,w=16): filled=int(max(0.,min(1.,v))*w); return "█"*filled+"░"*(w-filled)
 def _vbar(v,w=20):
     c=w//2; pos=int((v+1)/2*w); bar=list("─"*w); bar[c]="┼"
     if pos>c:
         for i in range(c,min(pos,w)): bar[i]="+"
     elif pos<c:
         for i in range(max(pos,0),c): bar[i]="-"
-    bar[max(0,min(pos,w-1))]="●"
-    return "".join(bar)
+    bar[max(0,min(pos,w-1))]="●"; return "".join(bar)
 
 def print_state(brain:Brain) -> None:
     st=brain.get_state(); sm=brain.get_summary(); nt=brain.nt
     emo=st["emotional_state"]; con=st["consciousness"]
-    bs=st["body_state"]; imp=st["impulse"]; intro=st["introspection"]
-    print(f"\n{'━'*76}")
-    print(f"  DEEP SANCTUARY v2  tick #{st['tick']:>4d}")
-    print(f"{'━'*76}")
+    bs=st["body_state"]; frd=st["freud"]; des=st["desire"]; ovr=st["overwhelm"]
+    print(f"\n{'━'*78}")
+    print(f"  DEEP SANCTUARY v3  tick #{st['tick']:>4d}")
+    print(f"{'━'*78}")
 
     # Matrice émotionnelle top-3
     print(f"\n  ◈ MATRICE ÉMOTIONNELLE:")
     for i,e in enumerate(emo["emotion_matrix"]):
-        bar=_bar(e["weight"],12); mark=" ◀ dominant" if i==0 else ""
-        print(f"    {i+1}. {e['label_fr']:<22s} {bar} {e['weight']:.0%}{mark}")
-
-    print(f"\n     Valence:  {_vbar(emo['valence'],22)} {emo['valence']:+.3f}")
+        mark=" ◀" if i==0 else "  "; print(f"    {mark} {e['label_fr']:<24s} {_bar(e['weight'],14)} {e['weight']:.0%}")
+    print(f"     Valence:  {_vbar(emo['valence'],22)} {emo['valence']:+.3f}")
     print(f"     Éveil:    {_bar(emo['arousal'],22)} {emo['arousal']:.3f}")
-    bg=emo["background"]
-    print(f"     Fond:     v={bg['valence']:+.3f}  a={bg['arousal']:.3f}  (humeur de fond)")
+    bg=emo["background"]; print(f"     Fond:     v={bg['valence']:+.3f}  a={bg['arousal']:.3f}")
 
     # Corps
-    print(f"\n  ◈ CORPS:")
-    print(f"     Cœur:     {_bar(bs.get('heart_rate',.5),22)} {bs.get('heart_rate',.5):.3f}")
-    print(f"     Respir.:  {_bar(bs.get('breathing',.35),22)} {bs.get('breathing',.35):.3f}")
-    print(f"     Tension:  {_bar(bs.get('muscle_tone',.25),22)} {bs.get('muscle_tone',.25):.3f}")
-    print(f"     Sueur:    {_bar(bs.get('skin_conduct',.1),22)} {bs.get('skin_conduct',.1):.3f}")
-    if brain.body.nociception.total_pain > 0.05:
-        print(f"     DOULEUR:  {_bar(brain.body.nociception.total_pain,22)}"
-              f" rapide={brain.body.nociception.fast_pain:.2f} lente={brain.body.nociception.slow_pain:.2f}")
-    if brain.body.chemistry.active_count()>0:
-        print(f"     Chimique: {brain.body.chemistry.active_count()} substance(s) active(s)")
+    print(f"\n  ◈ CORPS:  FC={bs.get('heart_rate',.5):.3f}  "
+          f"ANS={bs.get('balance',.35):.2f}  "
+          f"tension={bs.get('muscle_tone',.25):.2f}  "
+          f"sueur={bs.get('skin_conduct',.1):.2f}")
+    if brain.body.nociception.total_pain>.05:
+        print(f"     DOULEUR: rapide={brain.body.nociception.fast_pain:.2f}  lente={brain.body.nociception.slow_pain:.2f}  sensib={brain.body.nociception.sensitization:.2f}")
 
-    # Neurotransmetteurs
-    print(f"\n  ◈ NEUROTRANSMETTEURS:")
-    for nm,rl,key in [("Dopamine","motivation","dopamine"),("Sérotonine","humeur","serotonin"),
-                       ("Noradrénaline","éveil","norepinephrine"),("Acétylcholine","mémoire","acetylcholine"),
-                       ("GABA","inhibition","gaba"),("Cortisol","stress","cortisol"),
-                       ("Ocytocine","social","oxytocin"),("Endorphines","plaisir","endorphins")]:
-        val=getattr(nt,key); alert=" ⚠" if (key=="cortisol" and val>0.6) else ""
-        print(f"     {nm:<14s} {_bar(val,14)} {val:.3f}  ({rl}){alert}")
+    # Neurotransmetteurs (compacts)
+    print(f"\n  ◈ NEUROCHIMIE:")
+    for nm,key in [("Dopamine","dopamine"),("Sérotonine","serotonin"),("NE","norepinephrine"),
+                    ("GABA","gaba"),("Cortisol","cortisol"),("Ocytocine","oxytocin"),("Endorphines","endorphins")]:
+        val=getattr(nt,key); alert="⚠" if (key=="cortisol" and val>.6) else " "
+        print(f"    {nm:<12s} {_bar(val,12)} {val:.3f} {alert}")
 
-    # Conscience et élans
-    print(f"\n  ◈ CONSCIENCE: [{con['label'].upper()}]  {con['level']:.3f}")
-    print(f"     méta-conscience={con['meta_awareness']:.3f}")
-    if brain.dmn.mind_wandering:
-        print(f"     ✦ mind-wandering: {brain.dmn.current_thought_type}")
-    if imp.get("impulse"):
-        itype=imp["impulse"]; meaning=ImpulseEngine.TYPES.get(itype,("",""))[1]
-        print(f"     ✦ ÉLAN SPONTANÉ: [{itype}]  ({meaning})  force={imp.get('strength',0.):.2f}")
-    if intro.get("meta_questions"):
-        print(f"     ✦ INTROSPECTION: {intro['meta_questions'][0]}")
+    # Psyché
+    print(f"\n  ◈ PSYCHÉ (Ça/Moi/Surmoi):")
+    print(f"    Ça (Id):    {_bar(frd['id_pressure'],12)} {frd['id_pressure']:.3f}  (libido={brain.freud.libido:.2f})")
+    print(f"    Moi (Ego):  {_bar(frd['ego_strength'],12)} {frd['ego_strength']:.3f}  conflit={frd['ego_conflict']:.2f}")
+    print(f"    Surmoi:     {_bar(frd['superego_brake'],12)} {frd['superego_brake']:.3f}  culpabilité={frd['guilt']:.2f}")
+    if frd['defense']!="none": print(f"    Défense: [{frd['defense']}]  anxiété={frd['anxiety']:.3f}")
 
-    # Régions actives
-    print(f"\n  ◈ RÉGIONS:")
-    for n,rs in st["regions"].items():
-        a=rs["activation"]; f=rs["fatigue"]
-        if a>0.1: print(f"     {n:<28s} {_bar(a,10)} {a:.2f}  fat={f:.2f}")
+    # Désir
+    print(f"\n  ◈ DÉSIR:")
+    print(f"    Niveau:   {_bar(des['desire_level'],12)} {des['desire_level']:.3f}  ({des['desire_type'] or '-'})")
+    print(f"    Physique: {_bar(des['physical_arousal'],12)} {des['physical_arousal']:.3f}  passion={des['passion']:.2f}")
+    print(f"    Wanting:  {_bar(des['wanting'],12)} {des['wanting']:.3f}  liking={des['liking']:.2f}")
+    print(f"    Audace:   {_bar(des['boldness'],12)} {des['boldness']:.3f}  intention={des['intention'] or '-'}")
 
+    # Besoins urgents
+    top3=brain.needs.top_urgent(3)
+    print(f"\n  ◈ BESOINS URGENTS:")
+    for name,level,urgency in top3:
+        if urgency>.05: print(f"    {name:<14s} niveau={level:.2f}  urgence={urgency:.2f}  {_bar(urgency,10)}")
+
+    # Submersion
+    if ovr["flooded"]: print(f"\n  ⚡ FLOODING: [{ovr['flood_type']}]  intensité={ovr['overwhelm_level']:.3f}")
+
+    # Expression autonome
+    expr=st["autonomous_expression"]
+    if expr: print(f"\n  ◈ EXPRESSION SPONTANÉE [{expr['type']}]:\n    \"{expr['content']}\"")
+
+    # Conscience et action
+    print(f"\n  ◈ CONSCIENCE: [{con['label'].upper()}] {con['level']:.3f}  méta={con['meta_awareness']:.3f}")
+    if brain.dmn.mind_wandering: print(f"    ✦ mind-wandering: {brain.dmn.current_thought_type}")
+    if brain.impulse_engine.current_impulse: print(f"    ✦ élan: [{brain.impulse_engine.current_impulse}] force={brain.impulse_engine.impulse_strength:.2f}")
     print(f"\n  ACTION: {sm['action']}  |  stress={sm['stress']:.3f}  |  motivation={sm['motivation']:.3f}")
-    print(f"{'━'*76}\n")
+    print(f"{'━'*78}\n")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §13  EXPÉRIENCES
+# §18  EXPÉRIENCES
 # ─────────────────────────────────────────────────────────────────────────────
 
-def exp_emotion(brain:Brain) -> None:
-    print(f"\n{'='*64}\nEXPÉRIENCE: Émergence des émotions\n{'='*64}")
-    print("\n[Phase 1] Récompense positive")
-    for i in range(5):
-        brain.sense(SensoryInput(chem_da=0.4,chem_sero=0.2,chem_opioid=0.3,
-            chem_lipophile=0.6,sem_valence=0.6,sem_charge=0.5,novelty=0.5,
-            stimulus_id="reward_A"))
-        brain.inject_reward(0.7); sm=brain.get_summary()
-        top3=" / ".join(f"{e['label']}({e['weight']:.0%})" for e in sm["emotion_matrix"])
-        print(f"  tick {sm['tick']:3d}: {top3}")
-    print("\n[Phase 2] Impact soudain fort")
-    for i in range(3):
-        brain.sense(SensoryInput(meca_force=0.85,meca_vitesse=0.95,meca_zone=0.2,location="torse"))
-        sm=brain.get_summary()
-        top3=" / ".join(f"{e['label']}({e['weight']:.0%})" for e in sm["emotion_matrix"])
-        print(f"  tick {sm['tick']:3d}: {top3}  DOULEUR={sm['pain']:.2f}  FC={sm['heart_rate']:.2f}")
-    print("\n[Phase 3] Repos — retour et élans")
-    for i in range(8):
-        brain.tick(); sm=brain.get_summary()
-        imp=f" [élan:{sm['impulse']}]" if sm['impulse'] else ""
-        print(f"  tick {sm['tick']:3d}: {sm['emotion']:15s} v={sm['valence']:+.2f} wandering={sm['mind_wandering']}{imp}")
-    print("\n[Phase 4] Son immersif (texture sonore complexe)")
+def exp_kiss(brain:Brain) -> None:
+    """Le même baiser — effets opposés selon la relation."""
+    print(f"\n{'='*70}\nEXPÉRIENCE: Contextualité du contact — le même geste, deux vécus\n{'='*70}")
+
+    # Établir deux relations
+    brain.relationships.set("amour", trust=0.95, affection=0.9, intimacy=0.8, familiarity=0.9)
+    brain.relationships.set("ennemi", trust=0.05, affection=-0.8, intimacy=0.0, familiarity=0.5)
+
+    kiss_stim = SensoryInput(meca_force=0.08, meca_vitesse=0.05, meca_zone=0.7,
+                              thermal=0.63, meca_duration=0.85, sem_intimite=0.9)
+
+    print("\n[Scénario 1] Baiser de l'être aimé (affection=0.9, intimité=0.8)")
+    print("  Contact progressif — 4 ticks (les émotions se construisent)")
+    kiss_love = copy.copy(kiss_stim); kiss_love.agent_id = "amour"
     for i in range(4):
-        brain.sense(SensoryInput(audio_grave=0.7,audio_medium=0.5,audio_aigu=0.6,
-            audio_rugosite=0.8,audio_rythme=0.65,audio_dynamique=0.85,audio_spatial=0.8))
-        sm=brain.get_summary()
-        top3=" / ".join(f"{e['label']}({e['weight']:.0%})" for e in sm["emotion_matrix"])
-        print(f"  tick {sm['tick']:3d}: {top3}  FC={sm['heart_rate']:.2f}")
+        brain.sense(kiss_love)
+        sm = brain.get_summary()
+        top3 = " / ".join(f"{e['label']}({e['weight']:.0%})" for e in sm["emotion_matrix"])
+        print(f"  tick {sm['tick']:3d}: {top3}  désir={sm['desire_level']:.3f}  arousal♡={sm['physical_arousal']:.3f}  FC={sm['heart_rate']:.3f}")
+    print(f"  Oxytocine: {brain.nt.oxytocin:.3f}  sérotonine={brain.nt.serotonin:.3f}")
+    print(f"  Intention: {sm['intention']}  audace={sm['boldness']:.3f}")
+    if sm.get("autonomous_expression"):
+        print(f"  → Expression: \"{sm['autonomous_expression']['content']}\"")
 
+    # Séparateur
+    fresh = Brain()
+    fresh.relationships.set("ennemi", trust=0.05, affection=-0.8, intimacy=0.0, familiarity=0.5)
 
-def exp_body(brain:Brain) -> None:
-    print(f"\n{'='*64}\nEXPÉRIENCE: Corps numérique — réactions physiologiques\n{'='*64}")
-    def show(sm,label=""):
-        print(f"  tick {sm['tick']:3d} {label:<20s}: "
-              f"FC={sm['heart_rate']:.3f}  "
-              f"douleur={sm['pain']:.3f}  "
-              f"ANS={brain.body.ans.balance:.2f}  "
-              f"émotion={sm['emotion']}")
-
-    print("\n[Phase 1] Baseline — repos")
-    for _ in range(3): show(brain.get_summary()," "); brain.tick()
-
-    print("\n[Phase 2] Contact mécanique soudain et fort")
-    for _ in range(3):
-        brain.sense(SensoryInput(meca_force=0.9,meca_vitesse=0.98,meca_zone=0.15,location="visage"))
-        show(brain.get_summary(),"impact fort")
-
-    print("\n[Phase 3] Contact doux et prolongé")
-    for _ in range(4):
-        brain.sense(SensoryInput(meca_force=0.04,meca_vitesse=0.06,meca_zone=0.85,
-                                  thermal=0.62,meca_duration=0.9,location="bras"))
-        brain.nt.modulate({"oxytocin":0.05})
-        show(brain.get_summary(),"contact doux")
-
-    print("\n[Phase 4] Substance chimique GABAergique-like (effet progressive)")
-    for i in range(6):
-        if i<2:
-            brain.sense(SensoryInput(chem_gaba=0.5,chem_nmda=-0.4,chem_da=0.25,
-                                      chem_lipophile=0.75,chem_onset=0.25,
-                                      stimulus_id="substance_G"))
-        else:
-            brain.tick()
-        sm=brain.get_summary()
-        print(f"  tick {sm['tick']:3d} substance_G t+{i}  : "
-              f"GABA={brain.nt.gaba:.3f}  DA={brain.nt.dopamine:.3f}  "
-              f"arousal={sm['arousal']:.3f}  émotion={sm['emotion']}")
-
-    print("\n[Phase 5] Stimulant adénosine-bloquant (café-like)")
-    brain.sense(SensoryInput(chem_adenosine=-0.7,chem_ne=0.35,chem_da=0.2,
-                              chem_lipophile=0.65,chem_onset=0.55,stimulus_id="substance_A"))
+    print("\n[Scénario 2] Même geste de la part de quelqu'un détesté (affection=-0.8)")
+    print("  Contact subi — 4 ticks")
+    kiss_hate = copy.copy(kiss_stim); kiss_hate.agent_id = "ennemi"
     for i in range(4):
-        brain.tick(); sm=brain.get_summary()
-        print(f"  tick {sm['tick']:3d} stimulant t+{i}   : "
-              f"NE={brain.nt.norepinephrine:.3f}  éveil={sm['arousal']:.3f}  action={sm['action']}")
+        fresh.sense(kiss_hate)
+        sm2 = fresh.get_summary()
+        top3 = " / ".join(f"{e['label']}({e['weight']:.0%})" for e in sm2["emotion_matrix"])
+        print(f"  tick {sm2['tick']:3d}: {top3}  peur={fresh.amygdala.fear_level:.3f}  NE={fresh.nt.norepinephrine:.3f}  FC={sm2['heart_rate']:.3f}")
+    print(f"  Cortisol: {fresh.nt.cortisol:.3f}  submersion={fresh.overwhelm.overwhelm_level:.3f}")
+    if sm2.get("autonomous_expression"):
+        print(f"  → Expression: \"{sm2['autonomous_expression']['content']}\"")
 
-    print("\n[Phase 6] Contenu sémantique menaçant puis intime")
-    brain.sense(SensoryInput(sem_valence=-0.75,sem_menace=0.8,sem_charge=0.85,
-                              sem_arousal=0.7,sem_complexite=0.5))
+    print("\n  CONCLUSION:")
+    print(f"  Scénario 1 (aimé):   émotion top={sm['emotion']}  désir={sm['desire_level']:.3f}  FC={sm['heart_rate']:.3f}")
+    print(f"  Scénario 2 (détesté): émotion top={sm2['emotion']}  peur={fresh.amygdala.fear_level:.3f}  FC={sm2['heart_rate']:.3f}")
+
+
+def exp_psyche(brain:Brain) -> None:
+    """Besoins, désir passionnel, Ça/Moi/Surmoi."""
+    print(f"\n{'='*70}\nEXPÉRIENCE: Psyché — besoins, désir, tensions freudiennes\n{'='*70}")
+
+    brain.relationships.set("proche", trust=0.85, affection=0.75, intimacy=0.7)
+
+    print("\n[Phase 1] Baseline — observer les besoins naturels")
+    for _ in range(5): brain.tick()
     sm=brain.get_summary()
-    print(f"  menace sémantique: {sm['emotion']}  stress={sm['stress']:.3f}")
-    brain.sense(SensoryInput(sem_valence=0.7,sem_intimite=0.85,sem_social=0.75,
-                              sem_charge=0.6,sem_arousal=0.35))
-    brain.nt.modulate({"oxytocin":0.1})
-    sm=brain.get_summary()
-    print(f"  intimité sémantique: {sm['emotion']}  social={brain.nt.social_openness:.3f}")
+    top3_n=brain.needs.top_urgent(3)
+    print(f"  Besoins urgents: {', '.join(f'{n}({u:.2f})' for n,l,u in top3_n)}")
+    print(f"  Id={sm['id_pressure']:.3f}  Surmoi={sm['superego_brake']:.3f}  Ego={sm['ego_strength']:.3f}")
 
-
-def exp_impulse(brain:Brain) -> None:
-    print(f"\n{'='*64}\nEXPÉRIENCE: Élans spontanés et introspection\n{'='*64}")
-    print("\n[Phase 1] Repos pur — observer les élans spontanés")
-    for i in range(20):
-        brain.tick(); sm=brain.get_summary()
-        if sm["impulse"] or sm["mind_wandering"]:
-            imp=f"ÉLAN:{sm['impulse']}({sm['impulse_strength']:.2f})" if sm["impulse"] else ""
-            wand=f"[{brain.dmn.current_thought_type}]" if sm["mind_wandering"] else ""
-            print(f"  tick {sm['tick']:3d}: {sm['emotion']:15s} v={sm['valence']:+.2f}  {imp} {wand}")
-
-    print("\n[Phase 2] Forcer fatigue — observer le drive de repos")
+    print("\n[Phase 2] Contact intime progressif → montée du désir")
     for i in range(10):
-        brain.sense(SensoryInput(sem_charge=0.9,sem_arousal=0.8,sem_complexite=0.9))
+        stim=SensoryInput(meca_force=0.05+i*0.02, meca_zone=0.7+i*0.02,
+                           meca_duration=0.7, thermal=0.62, sem_intimite=0.5+i*0.07,
+                           sem_valence=0.4+i*0.05, sem_social=0.8, agent_id="proche")
+        brain.nt.modulate({"oxytocin": 0.04, "dopamine": 0.02})
+        brain.sense(stim); sm=brain.get_summary()
+        print(f"  tick {sm['tick']:3d}: désir={sm['desire_level']:.3f}  arousal_physique={sm['physical_arousal']:.3f}"
+              f"  audace={sm['boldness']:.3f}  Id={sm['id_pressure']:.3f}")
+
+    print("\n[Phase 3] Désir intense — qu'est-ce qui émerge?")
+    sm=brain.get_summary()
+    print(f"  Intention:    {sm['intention']}  (force={brain.desire.intention_strength:.3f})")
+    print(f"  Type désir:   {sm['desire_type']}")
+    print(f"  Passion:      {brain.desire.passion:.3f}")
+    print(f"  Défense:      {sm['defense']}")
+    if sm.get("autonomous_expression"):
+        print(f"\n  Expression spontanée:")
+        print(f"  → TYPE:    [{sm['autonomous_expression']['type']}]")
+        print(f"  → CONTENU: \"{sm['autonomous_expression']['content']}\"")
+        if sm['autonomous_expression'].get("bold"):
+            print(f"  → [L'ÉLAN EST ASSEZ FORT POUR OSER]")
+
+
+def exp_overflow(brain:Brain) -> None:
+    """Perte de contrôle — flooding émotionnel."""
+    print(f"\n{'='*70}\nEXPÉRIENCE: Flooding — quand l'émotion dépasse le contrôle\n{'='*70}")
+
+    print("\n[Phase 1] Menaces répétées intenses → panique")
+    for i in range(6):
+        brain.sense(SensoryInput(meca_force=0.85,meca_vitesse=0.95,sem_menace=0.95,
+            sem_valence=-0.9,sem_arousal=0.95,sem_charge=0.95))
+        sm=brain.get_summary()
+        flood=f"⚡FLOOD:{sm['flood_type']}" if sm['overwhelmed'] else ""
+        print(f"  tick {sm['tick']:3d}: peur={brain.amygdala.fear_level:.3f}  "
+              f"submersion={brain.overwhelm.overwhelm_level:.3f}  {flood}")
+        if sm.get("autonomous_expression"):
+            print(f"           → \"{sm['autonomous_expression']['content']}\"")
+
+    print("\n[Phase 2] Récupération")
     for i in range(8):
         brain.tick(); sm=brain.get_summary()
-        print(f"  tick {sm['tick']:3d}: fatigue_PFC={brain.pfc.fatigue:.3f}  "
-              f"élan={sm['impulse']}  repos_drive={brain.impulse_engine._drives['rest']:.3f}")
+        print(f"  tick {sm['tick']:3d}: submersion={brain.overwhelm.overwhelm_level:.3f}  "
+              f"émotion={sm['emotion']}  FC={sm['heart_rate']:.3f}")
 
-    print("\n[Phase 3] Introspection — rapport de conscience de soi")
+
+def exp_agency(brain:Brain) -> None:
+    """Agence autonome — le système agit sans qu'on lui demande."""
+    print(f"\n{'='*70}\nEXPÉRIENCE: Agence autonome — besoins et expression spontanée\n{'='*70}")
+
+    print("\n[Phase 1] Repos long — observer ce qui émerge spontanément")
+    expr_count=0
+    for i in range(30):
+        brain.tick(); sm=brain.get_summary()
+        if sm.get("autonomous_expression"):
+            expr=sm["autonomous_expression"]; expr_count+=1
+            print(f"  tick {sm['tick']:3d} [{expr['type']:<25s}]: \"{expr['content'][:70]}\"")
+        elif sm["mind_wandering"] and i%5==0:
+            print(f"  tick {sm['tick']:3d} [mind_wandering:{brain.dmn.current_thought_type:<15s}] émotions: "
+                  f"{'/'.join(e['label'] for e in sm['emotion_matrix'][:2])}")
+    print(f"\n  → {expr_count} expression(s) spontanée(s) sans aucun input externe")
+
+    print("\n[Phase 2] Déprivation de connexion — qu'arrive-t-il au besoin?")
+    start_level=brain.needs._levels["connection"]
+    for _ in range(20): brain.tick()
+    end_level=brain.needs._levels["connection"]
+    print(f"  Connexion: {start_level:.3f} → {end_level:.3f}  (déclin={start_level-end_level:.3f})")
+    print(f"  Besoin connexion urgence: {brain.needs._urgency['connection']:.3f}")
+    print(f"  Oxytocine: {brain.nt.oxytocin:.3f}  (déprimé?)")
+    sm=brain.get_summary()
+    print(f"  Humeur de fond: v={sm['background_mood']['valence']:+.3f}")
+    if sm.get("autonomous_expression"):
+        print(f"\n  Expression émergente de la solitude:")
+        print(f"  → \"{sm['autonomous_expression']['content']}\"")
+
+    print("\n[Phase 3] L'introspection — rapport de méta-conscience")
     brain.tick()
     intro=brain.introspection
     if intro.self_report:
-        print("  Rapport introspectif:")
+        print("  Rapport intérieur:")
         for k,v in intro.self_report.items():
-            print(f"    {k}: {v}")
+            if v and v!=0: print(f"    {k}: {v}")
         if intro.meta_questions:
-            print("  Questions émergentes:")
+            print("  Questions émergentes (sans qu'on les pose):")
             for q in intro.meta_questions:
-                print(f"    → '{q}'")
-    else:
-        print("  (introspection pas encore déclenchée)")
-
-
-def exp_stress(brain:Brain) -> None:
-    print(f"\n{'='*64}\nEXPÉRIENCE: Stress et récupération\n{'='*64}")
-    print("\n[Phase 1] Baseline"); [brain.tick() for _ in range(3)]
-    sm=brain.get_summary(); print(f"  Baseline: stress={sm['stress']:.3f}  FC={sm['heart_rate']:.3f}")
-    print("\n[Phase 2] Menace intense + impact")
-    for i in range(4):
-        brain.sense(SensoryInput(meca_force=0.8,meca_vitesse=0.9,sem_menace=0.9,
-            sem_valence=-0.85,sem_arousal=0.95,sem_charge=0.9))
-        sm=brain.get_summary()
-        print(f"  tick {sm['tick']:3d}: stress={sm['stress']:.3f}  NE={brain.nt.norepinephrine:.3f}"
-              f"  cortisol={brain.nt.cortisol:.3f}  FC={sm['heart_rate']:.3f}  action={sm['action']}")
-    print("\n[Phase 3] Récupération")
-    for i in range(10):
-        brain.tick(); sm=brain.get_summary()
-        print(f"  tick {sm['tick']:3d}: stress={sm['stress']:.3f}  FC={sm['heart_rate']:.3f}"
-              f"  émotion={sm['emotion']}  élan={sm['impulse'] or '-'}")
+                print(f"    → « {q} »")
 
 
 def run_demo(brain:Brain) -> None:
-    print("\n"+"="*76+"\n  DEEP SANCTUARY v2 — Démo corps + cerveau\n"+"="*76)
+    print("\n"+"="*78+"\n  DEEP SANCTUARY v3 — Démo psyché + corps\n"+"="*78)
+    brain.relationships.set("ami", trust=0.8, affection=0.7, intimacy=0.6)
+    brain.relationships.set("inconnu_menacant", trust=0.1, affection=-0.5, intimacy=0.0)
     scenarios=[
-        ("Paysage lumineux et calme",
-         SensoryInput(visual_lum=0.8,visual_chaleur=0.6,visual_contraste=0.3,
-                      sem_valence=0.4,sem_arousal=0.2,novelty=0.6)),
-        ("Impact inattendu — force modérée",
-         SensoryInput(meca_force=0.7,meca_vitesse=0.88,meca_zone=0.25,location="bras")),
-        ("Son immersif, rythmé, rugueux",
-         SensoryInput(audio_grave=0.8,audio_medium=0.6,audio_aigu=0.65,audio_rugosite=0.85,
-                      audio_rythme=0.7,audio_dynamique=0.9,audio_spatial=0.75)),
-        ("Contact doux et chaleureux",
-         SensoryInput(meca_force=0.03,meca_vitesse=0.05,meca_zone=0.9,thermal=0.65,
-                      meca_duration=0.8,sem_intimite=0.7,location="épaule")),
+        ("Paysage lumineux calme", SensoryInput(visual_lum=0.8,visual_chaleur=0.6,sem_valence=0.4,sem_arousal=0.2,novelty=0.6)),
+        ("Contact bienveillant d'un ami", SensoryInput(meca_force=0.06,meca_zone=0.85,thermal=0.62,sem_intimite=0.65,sem_social=0.8,agent_id="ami")),
+        ("Intrusion d'un inconnu menaçant", SensoryInput(meca_force=0.4,meca_vitesse=0.7,meca_zone=0.3,sem_menace=0.7,sem_valence=-0.5,agent_id="inconnu_menacant")),
+        ("Son intense et rugueux", SensoryInput(audio_grave=0.8,audio_aigu=0.7,audio_rugosite=0.9,audio_rythme=0.65,audio_dynamique=0.85)),
     ]
     for name,stim in scenarios:
-        print(f"\n→ {name}")
-        brain.sense(stim); print_state(brain)
+        print(f"\n→ {name}"); brain.sense(stim); print_state(brain)
     print("\nRepos (5 ticks)...")
     for _ in range(5): brain.tick()
     print_state(brain)
 
 
-def run_free(brain:Brain, ticks:int) -> None:
-    print(f"\n{'='*76}\n  Simulation libre — {ticks} ticks\n{'='*76}")
+def run_free(brain:Brain,ticks:int) -> None:
+    print(f"\n{'='*78}\n  Simulation libre — {ticks} ticks\n{'='*78}")
     stimuli=[
         SensoryInput(audio_grave=0.6,audio_medium=0.5,audio_rugosite=0.3,audio_rythme=0.7),
         SensoryInput(visual_lum=0.7,visual_chaleur=0.6,novelty=0.6,sem_valence=0.3),
         SensoryInput(sem_charge=0.7,sem_valence=-0.3,sem_menace=0.4,sem_arousal=0.6),
-        SensoryInput(meca_force=0.05,meca_zone=0.8,thermal=0.6,sem_intimite=0.5),
+        SensoryInput(meca_force=0.04,meca_zone=0.85,thermal=0.62,sem_intimite=0.5),
     ]
     for i in range(ticks):
         if i%6==3: brain.sense(random.choice(stimuli))
         else: brain.tick()
         sm=brain.get_summary()
         top=sm["emotion_matrix"][0]; w2=sm["emotion_matrix"][1] if len(sm["emotion_matrix"])>1 else {"label":"","weight":0}
-        imp=f"[{sm['impulse']}]" if sm["impulse"] else ""
-        print(f"  t={brain._tick:3d}: {top['label']:12s}({top['weight']:.0%}) + {w2['label']:10s}({w2['weight']:.0%})"
-              f"  v={sm['valence']:+.2f}  FC={sm['heart_rate']:.2f}  {imp}")
+        expr=f" ◈[{sm['autonomous_expression']['type']}]" if sm.get("autonomous_expression") else ""
+        flood=f" ⚡{sm['flood_type']}" if sm["overwhelmed"] else ""
+        print(f"  t={brain._tick:3d}: {top['label']:12s}+{w2['label']:10s}  v={sm['valence']:+.2f}  "
+              f"désir={sm['desire_level']:.2f}  ♡={sm['heart_rate']:.2f}{expr}{flood}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# §14  POINT D'ENTRÉE
+# §19  POINT D'ENTRÉE
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
-    parser=argparse.ArgumentParser(description="Deep Sanctuary v2 — Corps + Cerveau")
-    parser.add_argument("--demo",  action="store_true")
-    parser.add_argument("--exp",   type=str,default="emotion",
-        choices=["emotion","body","impulse","stress","all"])
-    parser.add_argument("--ticks", type=int,default=0)
+    parser=argparse.ArgumentParser(description="Deep Sanctuary v3 — Corps · Psyché · Agence")
+    parser.add_argument("--demo",action="store_true")
+    parser.add_argument("--exp",type=str,default="psyche",choices=["psyche","kiss","overflow","agency","body","all"])
+    parser.add_argument("--ticks",type=int,default=0)
     args=parser.parse_args()
-
     brain=Brain()
-    print("\n  ✦ Deep Sanctuary v2 initialisé — corps + cerveau prêts")
-
+    print("\n  ✦ Deep Sanctuary v3 — corps, psyché, besoins et agence initialisés")
     if args.demo: run_demo(brain)
     elif args.ticks>0: run_free(brain,args.ticks)
     elif args.exp=="all":
-        for fn in [exp_emotion,exp_body,exp_impulse,exp_stress]:
-            fn(Brain())
-    elif args.exp=="emotion":  exp_emotion(brain)
-    elif args.exp=="body":     exp_body(brain)
-    elif args.exp=="impulse":  exp_impulse(brain)
-    elif args.exp=="stress":   exp_stress(brain)
-
+        for fn in [exp_kiss,exp_psyche,exp_overflow,exp_agency]: fn(Brain())
+    elif args.exp=="psyche":   exp_psyche(brain)
+    elif args.exp=="kiss":     exp_kiss(brain)
+    elif args.exp=="overflow": exp_overflow(brain)
+    elif args.exp=="agency":   exp_agency(brain)
+    elif args.exp=="body":
+        # Expérience corps rapide
+        for stim in [
+            SensoryInput(meca_force=0.9,meca_vitesse=0.98,meca_zone=0.15,location="visage"),
+            SensoryInput(meca_force=0.04,meca_zone=0.9,thermal=0.62,meca_duration=0.9),
+            SensoryInput(chem_gaba=0.45,chem_nmda=-0.35,chem_da=0.3,chem_lipophile=0.7,chem_onset=0.25,stimulus_id="subst_G"),
+        ]:
+            brain.sense(stim); sm=brain.get_summary()
+            print(f"  tick {sm['tick']:3d}: {'/'.join(e['label'] for e in sm['emotion_matrix'][:2])}  FC={sm['heart_rate']:.3f}  douleur={sm['pain']:.3f}")
     print("\n  ✦ Simulation terminée.\n")
-
 
 if __name__=="__main__":
     main()
